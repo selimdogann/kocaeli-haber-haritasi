@@ -2,8 +2,10 @@
 Kocaeli Haber Haritası - Özgür Kocaeli Scraper
 
 Kaynak: https://www.ozgurkocaeli.com.tr
+Platform: Daktilo Haber Yazılımı v1.9
 """
 
+import re
 import logging
 from scraper.base_scraper import BaseScraper
 
@@ -11,19 +13,27 @@ logger = logging.getLogger(__name__)
 
 
 class OzgurKocaeliScraper(BaseScraper):
-    """Özgür Kocaeli haber sitesi scraper'ı."""
+    """Özgür Kocaeli haber sitesi scraper'ı (Daktilo CMS)."""
 
     def __init__(self):
         super().__init__(
             kaynak_adi="Özgür Kocaeli",
             base_url="https://www.ozgurkocaeli.com.tr",
         )
+        # Daktilo CMS kategori sayfaları (gerçek URL yapısı)
         self.kategori_urls = [
-            f"{self.base_url}/gundem",
-            f"{self.base_url}/asayis",
-            f"{self.base_url}/yasam",
-            f"{self.base_url}/kultur-sanat",
+            f"{self.base_url}/kocaeli-haberleri",          # Gündem
+            f"{self.base_url}/kocaeli-asayis-haberleri",    # Asayiş
+            f"{self.base_url}/kocaeli-yasam-haberleri",     # Yaşam
+            f"{self.base_url}/kocaeli-ekonomi-haberleri",   # Ekonomi
         ]
+
+    def _haber_linki_mi(self, href: str) -> bool:
+        """Verilen linkin bir haber detay sayfası olup olmadığını kontrol eder."""
+        if not href:
+            return False
+        # Daktilo CMS haber URL formatı: /haber/{id}/{slug}
+        return bool(re.search(r'/haber/\d+/', href))
 
     def haber_listesi_getir(self) -> list:
         """Özgür Kocaeli'den haber linklerini çeker."""
@@ -35,45 +45,35 @@ class OzgurKocaeliScraper(BaseScraper):
                 if not soup:
                     continue
 
-                seciciler = [
-                    "article a[href]",
-                    ".news-item a[href]",
-                    ".post-item a[href]",
-                    "h2 a[href]",
-                    "h3 a[href]",
-                    ".card-title a[href]",
-                    ".listing-item a[href]",
-                    ".news-list a[href]",
-                ]
+                # Daktilo CMS'de tüm linkleri tara
+                tum_linkler = soup.find_all("a", href=True)
+                for eleman in tum_linkler:
+                    href = eleman.get("href", "")
+                    if not href or href == "#":
+                        continue
 
-                for secici in seciciler:
-                    elemeler = soup.select(secici)
-                    for eleman in elemeler:
-                        href = eleman.get("href", "")
-                        if href and href != "#":
-                            if href.startswith("/"):
-                                href = f"{self.base_url}{href}"
-                            elif not href.startswith("http"):
-                                href = f"{self.base_url}/{href}"
+                    # Tam URL oluştur
+                    if href.startswith("/"):
+                        href = f"{self.base_url}{href}"
+                    elif not href.startswith("http"):
+                        href = f"{self.base_url}/{href}"
 
-                            if (
-                                href not in linkler
-                                and self.base_url in href
-                                and "/kategori/" not in href
-                                and "/etiket/" not in href
-                            ):
-                                linkler.append(href)
-
-                    if linkler:
-                        break
+                    # Sadece haber detay sayfalarını al
+                    if (
+                        self._haber_linki_mi(href)
+                        and href not in linkler
+                        and self.base_url in href
+                    ):
+                        linkler.append(href)
 
             except Exception as e:
                 logger.error(f"Özgür Kocaeli kategori hatası: {kategori_url} - {e}")
 
+        logger.info(f"Özgür Kocaeli - {len(linkler)} benzersiz haber linki bulundu.")
         return linkler[:50]
 
     def haber_detay_getir(self, url: str) -> dict:
-        """Özgür Kocaeli haber detayını çeker."""
+        """Özgür Kocaeli haber detayını çeker (Daktilo CMS formatı)."""
         soup = self.sayfa_getir(url)
         if not soup:
             return None
@@ -81,49 +81,50 @@ class OzgurKocaeliScraper(BaseScraper):
         haber = {}
 
         try:
-            # Başlık
-            baslik_seciciler = [
-                "h1.post-title", "h1.entry-title", "h1.news-title",
-                "h1.title", "article h1", ".detail-title h1", "h1",
-            ]
-            for secici in baslik_seciciler:
-                baslik = soup.select_one(secici)
-                if baslik:
-                    haber["baslik"] = baslik.get_text(strip=True)
-                    break
+            # Başlık - Daktilo CMS <h1> kullanır
+            baslik = soup.find("h1")
+            if baslik:
+                haber["baslik"] = baslik.get_text(strip=True)
 
-            # İçerik
+            # İçerik - Daktilo CMS yapısı
             icerik_seciciler = [
-                ".post-content", ".entry-content", ".news-content",
-                ".content-text", ".article-content", ".detail-content",
-                ".news-detail", "article .content",
+                ".detail-content", ".news-content", ".content-text",
+                ".post-content", ".entry-content", ".article-body",
+                "article .content", ".news-detail-content",
             ]
             for secici in icerik_seciciler:
                 icerik = soup.select_one(secici)
                 if icerik:
-                    for tag in icerik.find_all(["script", "style", "iframe"]):
+                    for tag in icerik.find_all(["script", "style", "iframe", "aside"]):
                         tag.decompose()
-                    haber["icerik"] = icerik.get_text(separator=" ", strip=True)
-                    break
+                    metin = icerik.get_text(separator=" ", strip=True)
+                    if len(metin) > 50:
+                        haber["icerik"] = metin
+                        break
 
-            # Tarih
-            tarih_seciciler = [
-                "time[datetime]", ".post-date", ".entry-date",
-                ".news-date", ".date", "span.date",
-            ]
-            for secici in tarih_seciciler:
-                tarih = soup.select_one(secici)
-                if tarih:
-                    tarih_metni = tarih.get("datetime") or tarih.get_text(strip=True)
-                    haber["yayin_tarihi"] = self.tarih_ayristir(tarih_metni)
-                    break
+            # İçerik bulunamazsa, paragrafları dene
+            if not haber.get("icerik"):
+                paragraflar = soup.find_all("p")
+                metin_parcalari = []
+                for p in paragraflar:
+                    metin = p.get_text(strip=True)
+                    if len(metin) > 30 and not metin.startswith(("©", "Cookie", "Veri")):
+                        metin_parcalari.append(metin)
+                if metin_parcalari:
+                    haber["icerik"] = " ".join(metin_parcalari[:10])
+
+            # Tarih - Önce meta tag, sonra sayfa içi
+            meta_tarih = soup.find("meta", property="article:published_time")
+            if not meta_tarih:
+                meta_tarih = soup.find("meta", attrs={"name": "datePublished"})
+            if meta_tarih and meta_tarih.get("content"):
+                haber["yayin_tarihi"] = self.tarih_ayristir(meta_tarih["content"])
 
             if not haber.get("yayin_tarihi"):
-                meta_tarih = soup.find("meta", property="article:published_time")
-                if meta_tarih:
-                    haber["yayin_tarihi"] = self.tarih_ayristir(
-                        meta_tarih.get("content", "")
-                    )
+                time_tag = soup.find("time")
+                if time_tag:
+                    tarih_metni = time_tag.get("datetime") or time_tag.get_text(strip=True)
+                    haber["yayin_tarihi"] = self.tarih_ayristir(tarih_metni)
 
         except Exception as e:
             logger.error(f"Özgür Kocaeli detay hatası: {url} - {e}")
