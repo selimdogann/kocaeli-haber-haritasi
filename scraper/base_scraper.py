@@ -59,7 +59,14 @@ class BaseScraper(ABC):
 
             response = self.session.get(url, timeout=self.timeout)
             response.raise_for_status()
-            response.encoding = response.apparent_encoding or "utf-8"
+
+            # Encoding: Content-Type charset > apparent_encoding > utf-8
+            if response.encoding and response.encoding.lower() != "iso-8859-1":
+                pass  # requests tarafından doğru belirlendi
+            elif response.apparent_encoding:
+                response.encoding = response.apparent_encoding
+            else:
+                response.encoding = "utf-8"
 
             return BeautifulSoup(response.text, "lxml")
 
@@ -109,36 +116,68 @@ class BaseScraper(ABC):
 
         tarih_metni = tarih_metni.strip()
 
-        # Yaygın tarih formatları
-        formatlar = [
-            "%d.%m.%Y %H:%M",
-            "%d.%m.%Y",
+        # Timezone bilgisini temizle (+03:00, +0300, Z)
+        import re as _re
+        tarih_metni = _re.sub(r'[+-]\d{2}:\d{2}$', '', tarih_metni)
+        tarih_metni = _re.sub(r'[+-]\d{4}$', '', tarih_metni)
+        tarih_metni = _re.sub(r'Z$', '', tarih_metni)
+        tarih_metni = tarih_metni.strip()
+
+        # Önce standart ISO/sayısal formatları dene
+        iso_formatlar = [
             "%Y-%m-%dT%H:%M:%S",
             "%Y-%m-%d %H:%M:%S",
             "%Y-%m-%d %H:%M",
             "%Y-%m-%d",
+            "%d.%m.%Y %H:%M",
+            "%d.%m.%Y",
             "%d/%m/%Y %H:%M",
             "%d/%m/%Y",
-            "%d %B %Y",
-            "%d %B %Y %H:%M",
         ]
 
-        # Türkçe ay isimleri dönüşümü
-        turkce_aylar = {
-            "ocak": "01", "şubat": "02", "mart": "03",
-            "nisan": "04", "mayıs": "05", "haziran": "06",
-            "temmuz": "07", "ağustos": "08", "eylül": "09",
-            "ekim": "10", "kasım": "11", "aralık": "12",
-        }
-
-        for ay_adi, ay_no in turkce_aylar.items():
-            if ay_adi in tarih_metni.lower():
-                tarih_metni = tarih_metni.lower().replace(ay_adi, ay_no)
-                break
-
-        for fmt in formatlar:
+        for fmt in iso_formatlar:
             try:
                 return datetime.strptime(tarih_metni, fmt)
+            except ValueError:
+                continue
+
+        # Türkçe ay isimleri dönüşümü (hem tam hem kısaltma)
+        turkce_aylar = {
+            "ocak": "01", "oca": "01",
+            "şubat": "02", "şub": "02",
+            "mart": "03", "mar": "03",
+            "nisan": "04", "nis": "04",
+            "mayıs": "05", "may": "05",
+            "haziran": "06", "haz": "06",
+            "temmuz": "07", "tem": "07",
+            "ağustos": "08", "ağu": "08",
+            "eylül": "09", "eyl": "09",
+            "ekim": "10", "eki": "10",
+            "kasım": "11", "kas": "11",
+            "aralık": "12", "ara": "12",
+        }
+
+        # Metin tabanlı tarihlerde " - " ayırıcısını boşluğa çevir
+        tarih_temiz = _re.sub(r'\s+-\s+', ' ', tarih_metni)
+
+        for ay_adi, ay_no in sorted(turkce_aylar.items(), key=lambda x: -len(x[0])):
+            if ay_adi in tarih_temiz.lower():
+                tarih_temiz = _re.sub(
+                    r'(?i)\b' + _re.escape(ay_adi) + r'\b',
+                    ay_no,
+                    tarih_temiz,
+                )
+                break
+
+        # Sayısal hale gelmiş metin tabanlı formatlar
+        metin_formatlar = [
+            "%d %m %Y %H:%M",
+            "%d %m %Y",
+        ]
+
+        for fmt in metin_formatlar:
+            try:
+                return datetime.strptime(tarih_temiz.strip(), fmt)
             except ValueError:
                 continue
 
@@ -234,10 +273,11 @@ class BaseScraper(ABC):
                 try:
                     haber = self.haber_detay_getir(link)
                     if haber and haber.get("baslik"):
-                        # Son N gün kontrolü
+                        # Son N gün kontrolü - tarihi yoksa haberi yine de dahil et
                         if haber.get("yayin_tarihi"):
                             if not self.son_n_gun_icinde_mi(haber["yayin_tarihi"]):
                                 continue
+                        # Tarih yoksa güncel kabul et (yakın zamanlı haber olma ihtimali yüksek)
 
                         haber["kaynak_site"] = self.kaynak_adi
                         haber["haber_linki"] = link
