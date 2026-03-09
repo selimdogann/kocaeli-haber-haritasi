@@ -1,0 +1,186 @@
+"""
+Kocaeli Haber Haritası - Geocoding (Koordinat Dönüştürme) Modülü
+
+Haber metninden tespit edilen konum bilgisini enlem/boylam
+koordinatlarına dönüştürür. Google Geocoding API kullanır.
+
+Özellikler:
+- API sonuçlarını veritabanında cache'ler (gereksiz tekrar çağrı önleme)
+- Başarısız geocoding durumunda kayıt işlenmez
+- Kocaeli sınırları içinde doğrulama yapılır
+"""
+
+import logging
+import googlemaps
+from config.settings import Config
+from database.mongodb import MongoDB
+
+logger = logging.getLogger(__name__)
+
+
+class Geocoder:
+    """Google Geocoding API ile koordinat dönüştürme sınıfı."""
+
+    # Kocaeli ili sınır koordinatları (yaklaşık dikdörtgen)
+    KOCAELI_SINIRLAR = {
+        "min_enlem": 40.45,
+        "max_enlem": 41.10,
+        "min_boylam": 29.20,
+        "max_boylam": 30.30,
+    }
+
+    def __init__(self):
+        """Geocoder'ı başlatır."""
+        self.api_key = Config.GOOGLE_GEOCODING_API_KEY
+        self.gmaps = None
+        self.db = None
+
+        if self.api_key:
+            try:
+                self.gmaps = googlemaps.Client(key=self.api_key)
+                logger.info("Google Geocoding API bağlantısı kuruldu.")
+            except Exception as e:
+                logger.error(f"Google Maps API bağlantı hatası: {e}")
+
+        try:
+            self.db = MongoDB()
+        except Exception as e:
+            logger.warning(f"MongoDB bağlantısı kurulamadı (cache devre dışı): {e}")
+
+    def koordinat_bul(self, konum_metni: str) -> dict:
+        """
+        Konum metnini koordinatlara dönüştürür.
+        Önce cache'i kontrol eder, yoksa API'ye başvurur.
+
+        Args:
+            konum_metni: Geocoding yapılacak konum metni
+                         Örn: "Yenişehir Mahallesi, İzmit, Kocaeli"
+
+        Returns:
+            dict: {
+                "enlem": float,
+                "boylam": float,
+                "formatli_adres": str,
+                "basarili": bool
+            } veya başarısız ise {"basarili": False}
+        """
+        if not konum_metni:
+            return {"basarili": False, "hata": "Konum metni boş"}
+
+        # 1. Cache kontrolü
+        cache_sonuc = self._cache_kontrol(konum_metni)
+        if cache_sonuc:
+            logger.info(f"Cache'den konum bulundu: {konum_metni}")
+            return {
+                "enlem": cache_sonuc["enlem"],
+                "boylam": cache_sonuc["boylam"],
+                "formatli_adres": konum_metni,
+                "basarili": True,
+                "kaynak": "cache",
+            }
+
+        # 2. API ile geocoding
+        if not self.gmaps:
+            logger.warning("Google Maps API yapılandırılmamış!")
+            return {"basarili": False, "hata": "API yapılandırılmamış"}
+
+        try:
+            # Konum metnine "Kocaeli, Türkiye" ekleyerek daha iyi sonuç al
+            sorgu = konum_metni
+            if "kocaeli" not in konum_metni.lower():
+                sorgu = f"{konum_metni}, Kocaeli, Türkiye"
+
+            sonuc = self.gmaps.geocode(
+                sorgu,
+                language="tr",
+                region="tr",
+            )
+
+            if not sonuc:
+                logger.warning(f"Geocoding sonuç bulunamadı: {konum_metni}")
+                return {"basarili": False, "hata": "Sonuç bulunamadı"}
+
+            # İlk sonucu al
+            ilk_sonuc = sonuc[0]
+            enlem = ilk_sonuc["geometry"]["location"]["lat"]
+            boylam = ilk_sonuc["geometry"]["location"]["lng"]
+            formatli_adres = ilk_sonuc["formatted_address"]
+
+            # 3. Kocaeli sınırları kontrolü
+            if not self._kocaeli_sinirlarinda_mi(enlem, boylam):
+                logger.warning(
+                    f"Konum Kocaeli sınırları dışında: {konum_metni} "
+                    f"({enlem}, {boylam})"
+                )
+                return {
+                    "basarili": False,
+                    "hata": "Konum Kocaeli sınırları dışında",
+                }
+
+            # 4. Cache'e kaydet
+            self._cache_kaydet(konum_metni, enlem, boylam)
+
+            logger.info(
+                f"Geocoding başarılı: {konum_metni} -> ({enlem}, {boylam})"
+            )
+
+            return {
+                "enlem": enlem,
+                "boylam": boylam,
+                "formatli_adres": formatli_adres,
+                "basarili": True,
+                "kaynak": "api",
+            }
+
+        except googlemaps.exceptions.ApiError as e:
+            logger.error(f"Geocoding API hatası: {e}")
+            return {"basarili": False, "hata": f"API hatası: {e}"}
+        except Exception as e:
+            logger.error(f"Geocoding genel hata: {e}")
+            return {"basarili": False, "hata": str(e)}
+
+    def toplu_koordinat_bul(self, konum_listesi: list) -> list:
+        """
+        Birden fazla konum için koordinat bulur.
+
+        Args:
+            konum_listesi: Konum metinleri listesi
+
+        Returns:
+            list: Koordinat sonuçları listesi
+        """
+        sonuclar = []
+        for konum in konum_listesi:
+            sonuc = self.koordinat_bul(konum)
+            sonuclar.append({
+                "konum_metni": konum,
+                **sonuc,
+            })
+        return sonuclar
+
+    def _kocaeli_sinirlarinda_mi(self, enlem: float, boylam: float) -> bool:
+        """
+        Koordinatların Kocaeli sınırları içinde olup olmadığını kontrol eder.
+
+        Args:
+            enlem: Enlem koordinatı
+            boylam: Boylam koordinatı
+
+        Returns:
+            bool: Sınırlar içindeyse True
+        """
+        return (
+            self.KOCAELI_SINIRLAR["min_enlem"] <= enlem <= self.KOCAELI_SINIRLAR["max_enlem"]
+            and self.KOCAELI_SINIRLAR["min_boylam"] <= boylam <= self.KOCAELI_SINIRLAR["max_boylam"]
+        )
+
+    def _cache_kontrol(self, konum_metni: str) -> dict:
+        """Cache'den konum bilgisi kontrol eder."""
+        if self.db:
+            return self.db.konum_getir(konum_metni)
+        return None
+
+    def _cache_kaydet(self, konum_metni: str, enlem: float, boylam: float):
+        """Geocoding sonucunu cache'e kaydeder."""
+        if self.db:
+            self.db.konum_kaydet(konum_metni, enlem, boylam)

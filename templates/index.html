@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗺️ Kocaeli Haber Haritası</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Maps API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap" async defer></script>
+</head>
+<body>
+
+    <!-- ÜST MENÜ -->
+    <header class="header">
+        <div class="header-left">
+            <h1 class="logo">🗺️ Kocaeli Haber Haritası</h1>
+            <span class="subtitle">Kentsel Haber İzleme Sistemi</span>
+        </div>
+        <div class="header-right">
+            <button id="btn-scrape" class="btn btn-primary" onclick="scrapingBaslat()">
+                🔄 Haberleri Güncelle
+            </button>
+            <div id="stats-badge" class="stats-badge">
+                <span id="toplam-haber-sayisi">0</span> Haber
+            </div>
+        </div>
+    </header>
+
+    <!-- ANA İÇERİK -->
+    <main class="main-content">
+
+        <!-- SOL PANEL - FİLTRELER -->
+        <aside class="sidebar">
+            <!-- Filtre Başlığı -->
+            <div class="filter-header">
+                <h2>📋 Filtreler</h2>
+                <button class="btn btn-sm btn-outline" onclick="filtreleriTemizle()">Temizle</button>
+            </div>
+
+            <!-- Haber Türü Filtresi -->
+            <div class="filter-group">
+                <label class="filter-label">Haber Türü</label>
+                <div class="checkbox-group" id="haber-turu-filtre">
+                    {% for tur_id, tur_bilgi in news_types.items() %}
+                    <label class="checkbox-item" style="--marker-color: {{ tur_bilgi.color }}">
+                        <input type="checkbox" value="{{ tur_id }}" checked onchange="filtreUygula()">
+                        <span class="checkbox-marker" style="background-color: {{ tur_bilgi.color }}"></span>
+                        <span class="checkbox-label">{{ tur_bilgi.icon }} {{ tur_bilgi.label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- İlçe Filtresi -->
+            <div class="filter-group">
+                <label class="filter-label">İlçe</label>
+                <select id="ilce-filtre" class="filter-select" onchange="filtreUygula()">
+                    <option value="">Tüm İlçeler</option>
+                    {% for ilce in districts %}
+                    <option value="{{ ilce }}">{{ ilce }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Tarih Filtresi -->
+            <div class="filter-group">
+                <label class="filter-label">Tarih Aralığı</label>
+                <div class="date-inputs">
+                    <input type="date" id="baslangic-tarihi" class="filter-input" onchange="filtreUygula()">
+                    <span class="date-separator">—</span>
+                    <input type="date" id="bitis-tarihi" class="filter-input" onchange="filtreUygula()">
+                </div>
+            </div>
+
+            <!-- İstatistikler -->
+            <div class="filter-group stats-group">
+                <label class="filter-label">📊 İstatistikler</label>
+                <div id="istatistikler" class="stats-container">
+                    <div class="stat-item">
+                        <span class="stat-label">Toplam Haber</span>
+                        <span class="stat-value" id="stat-toplam">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Haritadaki</span>
+                        <span class="stat-value" id="stat-konumlu">-</span>
+                    </div>
+                </div>
+
+                <!-- Tür dağılımı -->
+                <div id="tur-dagilimi" class="tur-dagilimi"></div>
+            </div>
+
+            <!-- Haber Listesi -->
+            <div class="filter-group haber-listesi-group">
+                <label class="filter-label">📰 Haberler</label>
+                <div id="haber-listesi" class="haber-listesi">
+                    <p class="loading-text">Haberler yükleniyor...</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- HARİTA -->
+        <div class="map-container">
+            <div id="map" class="map"></div>
+
+            <!-- Yükleniyor Göstergesi -->
+            <div id="loading-overlay" class="loading-overlay" style="display: none;">
+                <div class="spinner"></div>
+                <p>İşlem devam ediyor...</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- BİLDİRİM -->
+    <div id="bildirim" class="bildirim" style="display: none;"></div>
+
+    <!-- JavaScript -->
+    <script>
+        // Yapılandırma değerleri
+        const CONFIG = {
+            centerLat: {{ kocaeli_center_lat }},
+            centerLng: {{ kocaeli_center_lng }},
+            newsTypes: {{ news_types | tojson }},
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
