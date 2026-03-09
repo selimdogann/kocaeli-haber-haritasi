@@ -66,6 +66,22 @@ def _haber_formatla(haber: dict) -> dict:
     if haber.get("kaynak_site") and not haber.get("kaynak_adi"):
         haber["kaynak_adi"] = haber["kaynak_site"]
 
+    # Çoklu kaynak bilgisi (diger_kaynaklar → kaynaklar dizisi)
+    kaynaklar = []
+    # Ana kaynak
+    kaynaklar.append({
+        "kaynak_adi": haber.get("kaynak_site", ""),
+        "link": haber.get("haber_linki", ""),
+    })
+    # Diğer kaynaklar (benzerlik analizi ile eklenenler)
+    if haber.get("diger_kaynaklar"):
+        for kaynak in haber["diger_kaynaklar"]:
+            kaynaklar.append({
+                "kaynak_adi": kaynak.get("site_adi", ""),
+                "link": kaynak.get("link", ""),
+            })
+    haber["kaynaklar"] = kaynaklar
+
     # datetime nesnelerini string'e çevir
     if haber.get("olusturma_tarihi"):
         try:
