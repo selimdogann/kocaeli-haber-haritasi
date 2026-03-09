@@ -1,47 +1,125 @@
 /* =============================================
    KOCAELI HABER HARİTASI - ANA JAVASCRIPT DOSYASI
-   Google Maps Entegrasyonu & API İletişimi
+   Leaflet Harita Entegrasyonu & API İletişimi
    ============================================= */
 
 // ==================== GLOBAL DEĞİŞKENLER ====================
 let map;
 let markers = [];
-let infoWindow;
 let haberler = [];
-let markerClusterer = null;
 
 // ==================== HARİTA BAŞLATMA ====================
 function initMap() {
-    // Google Maps nesnesini oluştur
-    map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: CONFIG.centerLat, lng: CONFIG.centerLng },
+    // Leaflet harita nesnesini oluştur
+    map = L.map('map', {
+        center: [CONFIG.centerLat, CONFIG.centerLng],
         zoom: 11,
-        mapTypeControl: true,
-        mapTypeControlOptions: {
-            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-            position: google.maps.ControlPosition.TOP_RIGHT
-        },
-        streetViewControl: false,
-        fullscreenControl: true,
         zoomControl: true,
-        zoomControlOptions: {
-            position: google.maps.ControlPosition.RIGHT_CENTER
-        },
-        styles: [
-            {
-                featureType: 'poi',
-                elementType: 'labels',
-                stylers: [{ visibility: 'off' }]
-            }
-        ]
     });
 
-    // Tek bir InfoWindow nesnesi kullan
-    infoWindow = new google.maps.InfoWindow();
+    // OpenStreetMap tile katmanı
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+    }).addTo(map);
 
     // Sayfa yüklendiğinde haberleri getir
     haberleriGetir();
     istatistikleriGetir();
+}
+
+// Sayfa yüklendiğinde haritayı başlat
+document.addEventListener('DOMContentLoaded', initMap);
+
+// ==================== SVG PIN İKON OLUŞTURUCU ====================
+
+/**
+ * Pin şeklinde SVG marker ikonu oluşturur (Leaflet L.divIcon).
+ * Her haber türü için renkli pin + beyaz simge.
+ */
+function pinSvgOlustur(renk, ikonSvg) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
+        <defs>
+            <filter id="s${renk.replace('#','')}" x="-20%" y="-10%" width="140%" height="130%">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
+            </filter>
+        </defs>
+        <path d="M18 47C18 47 34 28 34 16.5C34 7.9 26.8 1 18 1C9.2 1 2 7.9 2 16.5C2 28 18 47 18 47Z"
+              fill="${renk}" stroke="#fff" stroke-width="2" filter="url(#s${renk.replace('#','')})"/>
+        <circle cx="18" cy="16" r="11" fill="rgba(255,255,255,0.25)"/>
+        ${ikonSvg}
+    </svg>`;
+}
+
+/**
+ * Haber türüne göre Leaflet ikon nesnesi döndürür
+ */
+const MARKER_SVG_MAP = {};
+
+function markerIkonuGetir(haberTuru) {
+    if (MARKER_SVG_MAP[haberTuru]) return MARKER_SVG_MAP[haberTuru];
+
+    const ikonlar = {
+        // Trafik Kazası → Araba simgesi (kırmızı)
+        trafik_kazasi: pinSvgOlustur('#E53E3E',
+            `<g fill="#fff" transform="translate(18,16)">
+                <path d="M-8,0.5 L-6,-4.5 L6,-4.5 L8,0.5 L8,3 L-8,3 Z"/>
+                <rect x="-5.5" y="-4" width="4" height="3" rx="0.5" fill="#E53E3E" opacity="0.5"/>
+                <rect x="1.5" y="-4" width="4" height="3" rx="0.5" fill="#E53E3E" opacity="0.5"/>
+                <circle cx="-5" cy="4.5" r="1.8" fill="#fff"/>
+                <circle cx="5" cy="4.5" r="1.8" fill="#fff"/>
+            </g>`),
+
+        // Yangın → Alev simgesi (turuncu)
+        yangin: pinSvgOlustur('#ED8936',
+            `<path d="M18,7 C18,7 12.5,12.5 12.5,16.5 C12.5,19.5 14.9,22 18,22
+                     C21.1,22 23.5,19.5 23.5,16.5 C23.5,12.5 18,7 18,7 Z" fill="#fff"/>
+             <path d="M18,13 C18,13 15.8,15.2 15.8,16.8 C15.8,18 16.8,19 18,19
+                     C19.2,19 20.2,18 20.2,16.8 C20.2,15.2 18,13 18,13 Z" fill="#ED8936"/>`),
+
+        // Hırsızlık → Kalkan simgesi (mor)
+        hirsizlik: pinSvgOlustur('#805AD5',
+            `<g fill="#fff" transform="translate(18,16)">
+                <path d="M0,-9 L8,-5 L8,1 C8,5.5 4.5,8.5 0,10 C-4.5,8.5 -8,5.5 -8,1 L-8,-5 Z"/>
+                <path d="M0,-5 L4.5,-2.5 L4.5,0.8 C4.5,3.8 2.5,5.5 0,6.5 C-2.5,5.5 -4.5,3.8 -4.5,0.8 L-4.5,-2.5 Z"
+                      fill="#805AD5" opacity="0.4"/>
+            </g>`),
+
+        // Elektrik Kesintisi → Şimşek simgesi (sarı)
+        elektrik_kesintisi: pinSvgOlustur('#D69E2E',
+            `<polygon points="20,6.5 14.5,15.5 17.5,15.5 14.5,25 22,14 18.5,14 21,6.5" fill="#fff"/>`),
+
+        // Kültürel Etkinlik → Nota simgesi (mavi)
+        kulturel_etkinlik: pinSvgOlustur('#3182CE',
+            `<g fill="#fff" transform="translate(18,16)">
+                <ellipse cx="-3.5" cy="5" rx="3.5" ry="2.5"/>
+                <rect x="-0.3" y="-8" width="2" height="13"/>
+                <path d="M1.7,-8 L8,-10 L8,-4.5 L1.7,-2.5 Z"/>
+            </g>`),
+
+        // Diğer → Gazete/belge simgesi (gri)
+        diger: pinSvgOlustur('#718096',
+            `<g fill="#fff" transform="translate(18,16)">
+                <rect x="-6.5" y="-8" width="13" height="16" rx="2"/>
+                <line x1="-4" y1="-4.5" x2="4" y2="-4.5" stroke="#718096" stroke-width="1.3"/>
+                <line x1="-4" y1="-1.5" x2="4" y2="-1.5" stroke="#718096" stroke-width="1.3"/>
+                <line x1="-4" y1="1.5" x2="2" y2="1.5" stroke="#718096" stroke-width="1.3"/>
+                <line x1="-4" y1="4.5" x2="3" y2="4.5" stroke="#718096" stroke-width="1.3"/>
+            </g>`),
+    };
+
+    const svgHtml = ikonlar[haberTuru] || ikonlar['diger'];
+
+    const ikon = L.divIcon({
+        html: svgHtml,
+        className: 'leaflet-pin-icon',
+        iconSize: [36, 48],
+        iconAnchor: [18, 48],
+        popupAnchor: [0, -48],
+    });
+
+    MARKER_SVG_MAP[haberTuru] = ikon;
+    return ikon;
 }
 
 // ==================== API İSTEKLERİ ====================
@@ -51,7 +129,6 @@ function initMap() {
  */
 async function haberleriGetir() {
     try {
-        // Aktif filtreleri topla
         const params = filtreParametreleriOlustur();
         const queryString = new URLSearchParams(params).toString();
 
@@ -61,14 +138,11 @@ async function haberleriGetir() {
         if (data.basarili) {
             haberler = data.haberler;
 
-            // Haritadaki markerları güncelle
             markerlariTemizle();
             haberleriHaritayaEkle(haberler);
 
-            // Haber listesini güncelle
             haberListesiniGuncelle(haberler);
 
-            // Üst bar haber sayısını güncelle
             document.getElementById('toplam-haber-sayisi').textContent = data.toplam;
         }
     } catch (error) {
@@ -87,12 +161,8 @@ async function istatistikleriGetir() {
 
         if (data.basarili) {
             const stats = data.istatistikler;
-
-            // Toplam ve konumlu sayıları güncelle
             document.getElementById('stat-toplam').textContent = stats.toplam_haber || 0;
             document.getElementById('stat-konumlu').textContent = stats.konumlu_haber || 0;
-
-            // Tür dağılımı grafiğini oluştur
             turDagilimiOlustur(stats.tur_dagilimi || {});
         }
     } catch (error) {
@@ -145,7 +215,6 @@ async function scrapingBaslat() {
                 `✅ Tamamlandı! ${rapor.toplam_kaydedilen} yeni haber eklendi (${rapor.toplam_cekilen} tarandı, ${rapor.sure_saniye.toFixed(0)}s)`,
                 'basarili'
             );
-            // Haberleri ve istatistikleri yenile
             await haberleriGetir();
             await istatistikleriGetir();
         } else {
@@ -177,145 +246,50 @@ function haberleriHaritayaEkle(haberListesi) {
 }
 
 /**
- * Pin şeklinde SVG marker ikonu oluşturur.
- * Her haber türü için renkli pin + beyaz simge.
- */
-function pinIkonuOlustur(renk, ikonSvg) {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="44" viewBox="0 0 32 44">
-        <defs>
-            <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.35"/>
-            </filter>
-        </defs>
-        <path d="M16 43C16 43 31 26 31 15.5C31 7.2 24.3 0.5 16 0.5C7.7 0.5 1 7.2 1 15.5C1 26 16 43 16 43Z"
-              fill="${renk}" stroke="#fff" stroke-width="1.5" filter="url(#ds)"/>
-        <circle cx="16" cy="15" r="10" fill="rgba(255,255,255,0.2)"/>
-        ${ikonSvg}
-    </svg>`;
-    return {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-        scaledSize: new google.maps.Size(34, 46),
-        anchor: new google.maps.Point(17, 46),
-    };
-}
-
-/**
- * Haber türüne göre pin ikonları — renkli pin + beyaz simge
- * Referans: araba, alev, şimşek, kilit, nota, gazete
- */
-let MARKER_ICONS = null;
-
-function markerIkonlariniHazirla() {
-    if (MARKER_ICONS) return;
-    MARKER_ICONS = {
-        // Trafik Kazası → Araba simgesi
-        trafik_kazasi: pinIkonuOlustur('#E53E3E',
-            `<g fill="#fff" transform="translate(16,15)">
-                <path d="M-7.5,0.5 L-5.5,-4 L5.5,-4 L7.5,0.5 L7.5,3 L-7.5,3 Z"/>
-                <rect x="-5" y="-3.5" width="3.5" height="2.5" rx="0.5" fill="#E53E3E" opacity="0.6"/>
-                <rect x="1.5" y="-3.5" width="3.5" height="2.5" rx="0.5" fill="#E53E3E" opacity="0.6"/>
-                <circle cx="-4.5" cy="4.2" r="1.6"/>
-                <circle cx="4.5" cy="4.2" r="1.6"/>
-            </g>`),
-
-        // Yangın → Alev simgesi
-        yangin: pinIkonuOlustur('#ED8936',
-            `<path d="M16,6.5 C16,6.5 11,11 11,15.5 C11,18.3 13.2,20.5 16,20.5
-                     C18.8,20.5 21,18.3 21,15.5 C21,11 16,6.5 16,6.5 Z" fill="#fff"/>
-             <path d="M16,12 C16,12 14,14 14,15.8 C14,16.9 14.9,17.8 16,17.8
-                     C17.1,17.8 18,16.9 18,15.8 C18,14 16,12 16,12 Z" fill="#ED8936"/>`),
-
-        // Hırsızlık → Kalkan simgesi
-        hirsizlik: pinIkonuOlustur('#805AD5',
-            `<g fill="#fff" transform="translate(16,15)">
-                <path d="M0,-8 L7,-4.5 L7,1 C7,5 4,7.5 0,9 C-4,7.5 -7,5 -7,1 L-7,-4.5 Z"/>
-                <path d="M0,-4.5 L4,-2.5 L4,0.8 C4,3.5 2,5 0,6 C-2,5 -4,3.5 -4,0.8 L-4,-2.5 Z" fill="#805AD5" opacity="0.45"/>
-            </g>`),
-
-        // Elektrik Kesintisi → Şimşek simgesi
-        elektrik_kesintisi: pinIkonuOlustur('#D69E2E',
-            `<polygon points="18,6 13,14.5 15.5,14.5 13,23 20,13.5 17,13.5 19,6" fill="#fff"/>`),
-
-        // Kültürel Etkinlik → Nota simgesi
-        kulturel_etkinlik: pinIkonuOlustur('#3182CE',
-            `<g fill="#fff" transform="translate(16,15)">
-                <ellipse cx="-3" cy="4.5" rx="3" ry="2.3"/>
-                <rect x="-0.3" y="-7" width="1.8" height="11.5"/>
-                <path d="M1.5,-7 L7,-9 L7,-4 L1.5,-2 Z"/>
-            </g>`),
-
-        // Diğer → Gazete/belge simgesi
-        diger: pinIkonuOlustur('#718096',
-            `<g fill="#fff" transform="translate(16,15)">
-                <rect x="-6" y="-7" width="12" height="14" rx="1.5"/>
-                <line x1="-3.5" y1="-4" x2="3.5" y2="-4" stroke="#718096" stroke-width="1.2"/>
-                <line x1="-3.5" y1="-1" x2="3.5" y2="-1" stroke="#718096" stroke-width="1.2"/>
-                <line x1="-3.5" y1="2" x2="1.5" y2="2" stroke="#718096" stroke-width="1.2"/>
-            </g>`),
-    };
-}
-
-/**
  * Tek bir haber için marker oluşturur
  */
 function markerOlustur(haber) {
-    markerIkonlariniHazirla();
-
     const turBilgi = CONFIG.newsTypes[haber.haber_turu] || {
         color: '#6B7280',
         icon: '📰',
         label: 'Diğer'
     };
 
-    // Haber türüne göre pin ikonu seç
-    const markerIcon = MARKER_ICONS[haber.haber_turu] || MARKER_ICONS['diger'];
+    const ikon = markerIkonuGetir(haber.haber_turu);
 
-    const marker = new google.maps.Marker({
-        position: {
-            lat: haber.koordinatlar.lat,
-            lng: haber.koordinatlar.lng
-        },
-        map: map,
-        icon: markerIcon,
-        title: haber.baslik,
-        animation: google.maps.Animation.DROP
-    });
+    const marker = L.marker(
+        [haber.koordinatlar.lat, haber.koordinatlar.lng],
+        { icon: ikon }
+    ).addTo(map);
 
     // Marker'a haber verisini ekle
     marker.haberData = haber;
 
-    // Tıklama olayı - InfoWindow aç
-    marker.addListener('click', () => {
-        infoWindowAc(marker, haber);
+    // Popup içeriğini oluştur ve bağla
+    const popupIcerik = popupIcerikOlustur(haber, turBilgi);
+    marker.bindPopup(popupIcerik, {
+        maxWidth: 320,
+        minWidth: 240,
+        className: 'haber-popup',
     });
 
     markers.push(marker);
 }
 
 /**
- * InfoWindow içeriğini oluşturur ve açar
+ * Popup (bilgi penceresi) içeriğini oluşturur
  */
-function infoWindowAc(marker, haber) {
-    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || {
-        color: '#6B7280',
-        icon: '📰',
-        label: 'Diğer'
-    };
-
-    // Tarihi formatla
+function popupIcerikOlustur(haber, turBilgi) {
     const tarih = haber.tarih ? tarihFormatla(haber.tarih) : 'Tarih bilinmiyor';
 
-    // Kaynak metni
     const kaynaklar = haber.kaynaklar ?
         haber.kaynaklar.map(k => k.kaynak_adi).join(', ') :
         (haber.kaynak_adi || '');
 
-    // İçerik özeti (ilk 150 karakter)
     const icerikOzet = haber.icerik ?
         haber.icerik.substring(0, 150) + (haber.icerik.length > 150 ? '...' : '') :
         '';
 
-    // Konum bilgisi
     const konum = [];
     if (haber.konum_bilgisi) {
         if (haber.konum_bilgisi.ilce) konum.push(haber.konum_bilgisi.ilce);
@@ -323,39 +297,33 @@ function infoWindowAc(marker, haber) {
     }
     const konumMetni = konum.length > 0 ? konum.join(', ') : 'Kocaeli';
 
-    // Haber linki
     const haberLinki = haber.haber_linki ||
         (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].link : '#');
 
-    const icerik = `
-        <div class="info-window">
-            <div class="info-window-title">${escapeHtml(haber.baslik)}</div>
-            <div class="info-window-meta">
-                <span>
-                    <span class="info-window-tag" style="background-color: ${turBilgi.color}">
-                        ${turBilgi.icon} ${turBilgi.label}
-                    </span>
+    return `
+        <div class="popup-content">
+            <div class="popup-title">${escapeHtml(haber.baslik)}</div>
+            <div class="popup-meta">
+                <span class="popup-tag" style="background-color: ${turBilgi.color}">
+                    ${turBilgi.icon} ${turBilgi.label}
                 </span>
                 <span>📅 ${tarih}</span>
                 <span>📍 ${escapeHtml(konumMetni)}</span>
                 ${kaynaklar ? `<span>📰 ${escapeHtml(kaynaklar)}</span>` : ''}
             </div>
-            ${icerikOzet ? `<div class="info-window-content">${escapeHtml(icerikOzet)}</div>` : ''}
-            <a href="${escapeHtml(haberLinki)}" target="_blank" rel="noopener" class="info-window-link">
-                🔗 Habere Git
+            ${icerikOzet ? `<div class="popup-excerpt">${escapeHtml(icerikOzet)}</div>` : ''}
+            <a href="${escapeHtml(haberLinki)}" target="_blank" rel="noopener" class="popup-link">
+                🔗 Habere Git &rarr;
             </a>
         </div>
     `;
-
-    infoWindow.setContent(icerik);
-    infoWindow.open(map, marker);
 }
 
 /**
  * Tüm markerları haritadan kaldırır
  */
 function markerlariTemizle() {
-    markers.forEach(marker => marker.setMap(null));
+    markers.forEach(marker => map.removeLayer(marker));
     markers = [];
 }
 
@@ -367,23 +335,19 @@ function markerlariTemizle() {
 function filtreParametreleriOlustur() {
     const params = {};
 
-    // Haber türü filtresi
     const seciliTurler = [];
     document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]:checked').forEach(cb => {
         seciliTurler.push(cb.value);
     });
 
-    // Eğer tüm türler seçili değilse, sadece seçili olanları gönder
     const tumCheckboxlar = document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]');
     if (seciliTurler.length < tumCheckboxlar.length && seciliTurler.length > 0) {
         params.haber_turu = seciliTurler.join(',');
     }
 
-    // İlçe filtresi
     const ilce = document.getElementById('ilce-filtre').value;
     if (ilce) params.ilce = ilce;
 
-    // Tarih filtresi
     const baslangic = document.getElementById('baslangic-tarihi').value;
     const bitis = document.getElementById('bitis-tarihi').value;
     if (baslangic) params.baslangic_tarihi = baslangic;
@@ -393,7 +357,7 @@ function filtreParametreleriOlustur() {
 }
 
 /**
- * Filtreleri uygular ve haberleri yeniden yükler
+ * Filtreleri uygular
  */
 function filtreUygula() {
     haberleriGetir();
@@ -403,19 +367,12 @@ function filtreUygula() {
  * Tüm filtreleri sıfırlar
  */
 function filtreleriTemizle() {
-    // Tüm checkboxları seç
     document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]').forEach(cb => {
         cb.checked = true;
     });
-
-    // İlçe filtresini sıfırla
     document.getElementById('ilce-filtre').value = '';
-
-    // Tarih filtrelerini sıfırla
     document.getElementById('baslangic-tarihi').value = '';
     document.getElementById('bitis-tarihi').value = '';
-
-    // Haberleri yenile
     filtreUygula();
 }
 
@@ -467,24 +424,19 @@ function habereTikla(index) {
     const haber = haberler[index];
     if (!haber) return;
 
-    // Koordinatı olan markerı bul
     if (haber.koordinatlar && haber.koordinatlar.lat && haber.koordinatlar.lng) {
         // Haritayı haberin konumuna taşı
-        map.panTo({
-            lat: haber.koordinatlar.lat,
-            lng: haber.koordinatlar.lng
+        map.setView([haber.koordinatlar.lat, haber.koordinatlar.lng], 14, {
+            animate: true,
+            duration: 0.5
         });
-        map.setZoom(14);
 
-        // İlgili markerı bul ve InfoWindow aç
+        // İlgili markerı bul ve popup aç
         const marker = markers.find(m =>
             m.haberData && m.haberData._id === haber._id
         );
         if (marker) {
-            infoWindowAc(marker, haber);
-            // Marker animasyonu
-            marker.setAnimation(google.maps.Animation.BOUNCE);
-            setTimeout(() => marker.setAnimation(null), 1500);
+            marker.openPopup();
         }
     } else {
         bildirimGoster('Bu haberin konum bilgisi bulunamadı', 'uyari');
@@ -501,7 +453,6 @@ function turDagilimiOlustur(dagilim) {
         return;
     }
 
-    // Maksimum değeri bul (bar genişliği için)
     const maxDeger = Math.max(...Object.values(dagilim), 1);
 
     let html = '';
@@ -529,36 +480,22 @@ function turDagilimiOlustur(dagilim) {
 
 // ==================== YARDIMCI FONKSİYONLAR ====================
 
-/**
- * Loading overlay'i göster/gizle
- */
 function loadingGoster(goster) {
     document.getElementById('loading-overlay').style.display = goster ? 'flex' : 'none';
 }
 
-/**
- * Bildirim göster
- */
 function bildirimGoster(mesaj, tip = 'basarili') {
     const bildirim = document.getElementById('bildirim');
     bildirim.textContent = mesaj;
     bildirim.className = `bildirim ${tip}`;
     bildirim.style.display = 'block';
-
-    // 5 saniye sonra gizle
-    setTimeout(() => {
-        bildirim.style.display = 'none';
-    }, 5000);
+    setTimeout(() => { bildirim.style.display = 'none'; }, 5000);
 }
 
-/**
- * Tarih formatlama (ISO → Türkçe)
- */
 function tarihFormatla(tarihStr) {
     try {
         const tarih = new Date(tarihStr);
         if (isNaN(tarih.getTime())) return tarihStr;
-
         return tarih.toLocaleDateString('tr-TR', {
             day: 'numeric',
             month: 'long',
@@ -569,9 +506,6 @@ function tarihFormatla(tarihStr) {
     }
 }
 
-/**
- * HTML XSS koruması
- */
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
