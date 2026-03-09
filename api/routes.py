@@ -13,7 +13,7 @@ REST API endpoint'leri:
 from flask import Blueprint, jsonify, request
 import logging
 from database.mongodb import MongoDB
-from scraper.scraper_manager import ScraperManager
+from scraper.scraper_manager import ScraperManager, scrape_progress
 from config.settings import Config
 
 logger = logging.getLogger(__name__)
@@ -192,6 +192,12 @@ def scraping_baslat():
     except Exception as e:
         logger.error(f"Scraping hatası: {e}")
         return jsonify({"hata": str(e)}), 500
+
+
+@api_bp.route("/scrape/progress", methods=["GET"])
+def scrape_ilerleme():
+    """Scraping işleminin ilerleme durumunu döndürür."""
+    return jsonify(scrape_progress)
 
 
 @api_bp.route("/istatistikler", methods=["GET"])

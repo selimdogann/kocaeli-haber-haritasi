@@ -126,6 +126,35 @@
             centerLng: {{ kocaeli_center_lng }},
             newsTypes: {{ news_types | tojson }},
         };
+
+        // Google Maps yetkilendirme hatası yakalayıcı
+        window.gm_authFailure = function() {
+            console.error('Google Maps API yetkilendirme hatası!');
+            const mapDiv = document.getElementById('map');
+            if (mapDiv) {
+                mapDiv.innerHTML = `
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                        height:100%;background:#1e293b;color:white;text-align:center;padding:40px;font-family:Inter,sans-serif;">
+                        <div style="font-size:3rem;margin-bottom:16px;">🗺️</div>
+                        <h2 style="margin-bottom:12px;color:#f87171;">Google Maps API Hatası</h2>
+                        <p style="color:#94a3b8;max-width:500px;line-height:1.6;margin-bottom:20px;">
+                            Harita yüklenemedi. Lütfen Google Cloud Console'da aşağıdakileri kontrol edin:
+                        </p>
+                        <ul style="text-align:left;color:#cbd5e1;line-height:2;list-style:none;padding:0;">
+                            <li>✅ <b>Maps JavaScript API</b> etkinleştirilmiş olmalı</li>
+                            <li>✅ Faturalandırma hesabı aktif olmalı</li>
+                            <li>✅ API anahtarı kısıtlamalarında Maps JavaScript API seçili olmalı</li>
+                            <li>✅ HTTP Referrer kısıtlaması varsa <b>localhost</b> eklenmiş olmalı</li>
+                        </ul>
+                        <a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com"
+                           target="_blank" rel="noopener"
+                           style="margin-top:20px;padding:10px 24px;background:#3b82f6;color:white;
+                                  border-radius:8px;text-decoration:none;font-weight:600;">
+                            🔗 Google Cloud Console'u Aç
+                        </a>
+                    </div>`;
+            }
+        };
     </script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
