@@ -7,6 +7,7 @@ temizler, sınıflandırır, konumlarını çıkarır ve veritabanına kaydeder.
 
 import logging
 from datetime import datetime
+import numpy as np
 from scraper.cagdas_kocaeli import CagdasKocaeliScraper
 from scraper.ozgur_kocaeli import OzgurKocaeliScraper
 from scraper.ses_kocaeli import SesKocaeliScraper
@@ -52,6 +53,11 @@ class ScraperManager:
             logger.error(f"MongoDB bağlantı hatası: {e}")
             self.db = None
 
+        # Performans cache'leri (her scrape çağrısında yeniden hazırlanır)
+        self._mevcut_haberler_cache = []
+        self._mevcut_linkler_cache = set()
+        self._mevcut_embeddingler_cache = np.array([])
+
     @property
     def benzerlik_analizoru(self):
         """Benzerlik analizörünü lazy loading ile yükler."""
@@ -79,6 +85,24 @@ class ScraperManager:
         }
 
         tum_haberler = []
+
+        # 0. Performans için mevcut haber/cache hazırlığı
+        if self.db:
+            self._mevcut_haberler_cache = self.db.tum_haber_metinlerini_getir()
+            self._mevcut_linkler_cache = {
+                h.get("haber_linki")
+                for h in self._mevcut_haberler_cache
+                if h.get("haber_linki")
+            }
+
+            if self._mevcut_haberler_cache:
+                mevcut_metinler = [
+                    f"{h.get('baslik', '')} {h.get('icerik', '')}"
+                    for h in self._mevcut_haberler_cache
+                ]
+                self._mevcut_embeddingler_cache = (
+                    self.benzerlik_analizoru.embeddingleri_olustur(mevcut_metinler)
+                )
 
         # 1. Tüm kaynaklardan haberleri çek
         for scraper in self.scraperlar:
@@ -145,7 +169,7 @@ class ScraperManager:
             str: İşlem sonucu ('kaydedildi', 'tekrar', 'benzer', 'konumsuz', 'hata')
         """
         # 1. Duplicate kontrolü (link bazlı)
-        if self.db and self.db.haber_linki_var_mi(haber.get("haber_linki", "")):
+        if haber.get("haber_linki") in self._mevcut_linkler_cache:
             return "tekrar"
 
         # 2. Metin temizleme
@@ -160,26 +184,30 @@ class ScraperManager:
             return "hata"
 
         # 3. Benzerlik kontrolü (embedding tabanlı)
-        if self.db:
-            mevcut_haberler = self.db.tum_haber_metinlerini_getir()
-            if mevcut_haberler:
-                yeni_metin = f"{haber['baslik']} {haber.get('icerik', '')}"
-                benzerler = self.benzerlik_analizoru.benzerleri_bul(
-                    yeni_metin, mevcut_haberler
-                )
+        yeni_metin = f"{haber['baslik']} {haber.get('icerik', '')}"
 
-                if benzerler:
-                    # Aynı haber bulundu - kaynak bilgisini ekle
-                    en_benzer = benzerler[0]
-                    self.db.haber_kaynak_ekle(
-                        en_benzer["haber"]["haber_linki"],
-                        {
-                            "site_adi": haber.get("kaynak_site", ""),
-                            "link": haber.get("haber_linki", ""),
-                            "benzerlik_orani": en_benzer["benzerlik_orani"],
-                        },
-                    )
-                    return "benzer"
+        if self.db and self._mevcut_haberler_cache:
+            yeni_embedding = self.benzerlik_analizoru.embedding_olustur(yeni_metin)
+            benzerler = self.benzerlik_analizoru.benzerleri_bul(
+                yeni_metin,
+                self._mevcut_haberler_cache,
+                mevcut_embeddingler=self._mevcut_embeddingler_cache,
+                yeni_embedding=yeni_embedding,
+            )
+
+            if benzerler:
+                # Aynı haber bulundu - kaynak bilgisini ekle
+                en_benzer = benzerler[0]
+                self.db.haber_kaynak_ekle(
+                    en_benzer["haber"]["haber_linki"],
+                    {
+                        "site_adi": haber.get("kaynak_site", ""),
+                        "link": haber.get("haber_linki", ""),
+                        "benzerlik_orani": en_benzer["benzerlik_orani"],
+                    },
+                )
+                self._mevcut_linkler_cache.add(haber.get("haber_linki"))
+                return "benzer"
 
         # 4. Haber sınıflandırma
         siniflandirma = self.siniflandirici.siniflandir(
@@ -233,6 +261,23 @@ class ScraperManager:
         if self.db:
             basarili = self.db.haber_ekle(haber)
             if basarili:
+                # Cache'leri güncel tut
+                self._mevcut_linkler_cache.add(haber.get("haber_linki"))
+                self._mevcut_haberler_cache.append({
+                    "baslik": haber.get("baslik", ""),
+                    "icerik": haber.get("icerik", ""),
+                    "haber_linki": haber.get("haber_linki", ""),
+                })
+
+                yeni_embedding = self.benzerlik_analizoru.embedding_olustur(yeni_metin)
+                if yeni_embedding is not None:
+                    if self._mevcut_embeddingler_cache is None or len(self._mevcut_embeddingler_cache) == 0:
+                        self._mevcut_embeddingler_cache = np.array([yeni_embedding])
+                    else:
+                        self._mevcut_embeddingler_cache = np.vstack(
+                            [self._mevcut_embeddingler_cache, yeni_embedding]
+                        )
+
                 return "kaydedildi"
 
         if not haber.get("enlem"):

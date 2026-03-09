@@ -27,7 +27,9 @@ class Config:
     # Scraping Ayarları
     SCRAPING_DAYS = int(os.getenv("SCRAPING_DAYS", 3))
     REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", 30))
-    REQUEST_DELAY = int(os.getenv("REQUEST_DELAY", 2))
+    REQUEST_DELAY = float(os.getenv("REQUEST_DELAY", 0.3))
+    SCRAPER_MAX_WORKERS = int(os.getenv("SCRAPER_MAX_WORKERS", 8))
+    SCRAPER_MAX_LINKS_PER_SOURCE = int(os.getenv("SCRAPER_MAX_LINKS_PER_SOURCE", 50))
 
     # Kocaeli Merkez Koordinatları (Harita başlangıç noktası)
     KOCAELI_CENTER_LAT = 40.7654

@@ -68,6 +68,25 @@ class SimilarityAnalyzer:
             logger.error(f"Embedding oluşturma hatası: {e}")
             return None
 
+    def embeddingleri_olustur(self, metinler: list) -> np.ndarray:
+        """
+        Metin listesi için toplu embedding üretir.
+
+        Args:
+            metinler: Embedding üretilecek metin listesi
+
+        Returns:
+            numpy.ndarray: Embedding matrisi veya boş dizi
+        """
+        if self.model is None or not metinler:
+            return np.array([])
+
+        try:
+            return self.model.encode(metinler, show_progress_bar=False)
+        except Exception as e:
+            logger.error(f"Toplu embedding oluşturma hatası: {e}")
+            return np.array([])
+
     def benzerlik_hesapla(self, metin1: str, metin2: str) -> float:
         """
         İki metin arasındaki kosinüs benzerliğini hesaplar.
@@ -114,7 +133,13 @@ class SimilarityAnalyzer:
         benzerlik = self.benzerlik_hesapla(metin1, metin2)
         return benzerlik >= self.esik_degeri
 
-    def benzerleri_bul(self, yeni_haber: str, mevcut_haberler: list) -> list:
+    def benzerleri_bul(
+        self,
+        yeni_haber: str,
+        mevcut_haberler: list,
+        mevcut_embeddingler: np.ndarray = None,
+        yeni_embedding: np.ndarray = None,
+    ) -> list:
         """
         Yeni bir haberin mevcut haberler arasındaki benzerlerini bulur.
 
@@ -130,19 +155,21 @@ class SimilarityAnalyzer:
 
         try:
             # Yeni haber embedding'i
-            yeni_embedding = self.embedding_olustur(yeni_haber)
+            if yeni_embedding is None:
+                yeni_embedding = self.embedding_olustur(yeni_haber)
             if yeni_embedding is None:
                 return []
 
             # Mevcut haberlerin embedding'leri
-            mevcut_metinler = [
-                f"{h.get('baslik', '')} {h.get('icerik', '')}"
-                for h in mevcut_haberler
-            ]
+            if mevcut_embeddingler is None:
+                mevcut_metinler = [
+                    f"{h.get('baslik', '')} {h.get('icerik', '')}"
+                    for h in mevcut_haberler
+                ]
+                mevcut_embeddingler = self.embeddingleri_olustur(mevcut_metinler)
 
-            mevcut_embeddingler = self.model.encode(
-                mevcut_metinler, show_progress_bar=False
-            )
+            if mevcut_embeddingler is None or len(mevcut_embeddingler) == 0:
+                return []
 
             # Kosinüs benzerlikleri hesapla
             benzerlikler = cosine_similarity(
