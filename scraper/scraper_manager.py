@@ -189,9 +189,10 @@ class ScraperManager:
         haber["haber_turu"] = siniflandirma["haber_turu"]
         haber["siniflandirma_guven"] = siniflandirma["guven_skoru"]
 
-        # Sınıflandırılamayan haberleri atla
+        # Sınıflandırılamayan haberleri "diger" olarak etiketle
         if not haber["haber_turu"]:
-            return "hata"
+            haber["haber_turu"] = "diger"
+            haber["siniflandirma_guven"] = 0.0
 
         # 5. Konum çıkarımı
         konum_bilgisi = self.konum_cikarici.konum_cikar(
