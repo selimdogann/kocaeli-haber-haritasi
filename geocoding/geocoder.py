@@ -29,6 +29,35 @@ class Geocoder:
         "max_boylam": 30.30,
     }
 
+    # Kocaeli ilçe merkez koordinatları (Google API kullanılamadığında fallback)
+    ILCE_KOORDINATLARI = {
+        "İzmit": {"enlem": 40.7654, "boylam": 29.9408},
+        "Gebze": {"enlem": 40.8027, "boylam": 29.4307},
+        "Darıca": {"enlem": 40.7690, "boylam": 29.3753},
+        "Gölcük": {"enlem": 40.7167, "boylam": 29.8333},
+        "Kandıra": {"enlem": 41.0714, "boylam": 30.1522},
+        "Karamürsel": {"enlem": 40.6917, "boylam": 29.6167},
+        "Körfez": {"enlem": 40.7239, "boylam": 29.7644},
+        "Derince": {"enlem": 40.7550, "boylam": 29.8150},
+        "Başiskele": {"enlem": 40.7167, "boylam": 29.9833},
+        "Çayırova": {"enlem": 40.8261, "boylam": 29.3731},
+        "Dilovası": {"enlem": 40.7833, "boylam": 29.5333},
+        "Kartepe": {"enlem": 40.6833, "boylam": 30.0500},
+        # Küçük yazım varyantları
+        "izmit": {"enlem": 40.7654, "boylam": 29.9408},
+        "gebze": {"enlem": 40.8027, "boylam": 29.4307},
+        "darıca": {"enlem": 40.7690, "boylam": 29.3753},
+        "gölcük": {"enlem": 40.7167, "boylam": 29.8333},
+        "kandıra": {"enlem": 41.0714, "boylam": 30.1522},
+        "karamürsel": {"enlem": 40.6917, "boylam": 29.6167},
+        "körfez": {"enlem": 40.7239, "boylam": 29.7644},
+        "derince": {"enlem": 40.7550, "boylam": 29.8150},
+        "başiskele": {"enlem": 40.7167, "boylam": 29.9833},
+        "çayırova": {"enlem": 40.8261, "boylam": 29.3731},
+        "dilovası": {"enlem": 40.7833, "boylam": 29.5333},
+        "kartepe": {"enlem": 40.6833, "boylam": 30.0500},
+    }
+
     def __init__(self):
         """Geocoder'ı başlatır."""
         self.api_key = Config.GOOGLE_GEOCODING_API_KEY
@@ -79,7 +108,14 @@ class Geocoder:
                 "kaynak": "cache",
             }
 
-        # 2. API ile geocoding
+        # 2. Yerel ilçe koordinatları ile fallback dene
+        yerel_sonuc = self._yerel_koordinat_bul(konum_metni)
+        if yerel_sonuc:
+            # Yerel sonucu da cache'e kaydet
+            self._cache_kaydet(konum_metni, yerel_sonuc["enlem"], yerel_sonuc["boylam"])
+            return yerel_sonuc
+
+        # 3. API ile geocoding
         if not self.gmaps:
             logger.warning("Google Maps API yapılandırılmamış!")
             return {"basarili": False, "hata": "API yapılandırılmamış"}
@@ -157,6 +193,38 @@ class Geocoder:
                 **sonuc,
             })
         return sonuclar
+
+    def _yerel_koordinat_bul(self, konum_metni: str) -> dict:
+        """
+        Yerel ilçe koordinatları sözlüğünden konum metni içindeki
+        ilçeyi tespit ederek koordinat döndürür.
+        Google Geocoding API kullanılamadığında fallback olarak çalışır.
+
+        Args:
+            konum_metni: Konum metni (örn: "İzmit, Kocaeli" veya "Kartepe'de okul")
+
+        Returns:
+            dict: Koordinat bilgisi veya None
+        """
+        metin_lower = konum_metni.lower()
+        for ilce_adi, koordinat in self.ILCE_KOORDINATLARI.items():
+            # Sadece büyük harfli (orijinal) ilçe adlarını kontrol et
+            if ilce_adi[0].isupper() and ilce_adi.lower() in metin_lower:
+                import random
+                # Küçük bir rastgele sapma ekle (aynı ilçedeki haberler üst üste binmesin)
+                enlem = koordinat["enlem"] + random.uniform(-0.008, 0.008)
+                boylam = koordinat["boylam"] + random.uniform(-0.008, 0.008)
+                logger.info(
+                    f"Yerel koordinat bulundu: {konum_metni} -> {ilce_adi} ({enlem:.4f}, {boylam:.4f})"
+                )
+                return {
+                    "enlem": enlem,
+                    "boylam": boylam,
+                    "formatli_adres": f"{ilce_adi}, Kocaeli",
+                    "basarili": True,
+                    "kaynak": "yerel",
+                }
+        return None
 
     def _kocaeli_sinirlarinda_mi(self, enlem: float, boylam: float) -> bool:
         """
