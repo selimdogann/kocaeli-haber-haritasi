@@ -30,6 +30,57 @@ def get_db():
         return None
 
 
+def _haber_formatla(haber: dict) -> dict:
+    """
+    MongoDB'den gelen haber verisini frontend'in beklediği formata dönüştürür.
+
+    MongoDB alanları → Frontend beklentileri:
+      enlem/boylam → koordinatlar.lat/lng
+      ilce/mahalle → konum_bilgisi.ilce/mahalle
+      yayin_tarihi → tarih
+      kaynak_site → kaynak_adi
+    """
+    # Koordinat yapısı
+    haber["koordinatlar"] = None
+    if haber.get("enlem") and haber.get("boylam"):
+        haber["koordinatlar"] = {
+            "lat": haber["enlem"],
+            "lng": haber["boylam"],
+        }
+
+    # Konum bilgisi yapısı
+    haber["konum_bilgisi"] = {
+        "ilce": haber.get("ilce"),
+        "mahalle": haber.get("mahalle"),
+    }
+
+    # Tarih alanı (frontend 'tarih' bekliyor)
+    if haber.get("yayin_tarihi"):
+        try:
+            haber["tarih"] = haber["yayin_tarihi"].isoformat()
+            haber["yayin_tarihi"] = haber["yayin_tarihi"].isoformat()
+        except AttributeError:
+            haber["tarih"] = str(haber["yayin_tarihi"])
+
+    # Kaynak adı (frontend 'kaynak_adi' bekliyor)
+    if haber.get("kaynak_site") and not haber.get("kaynak_adi"):
+        haber["kaynak_adi"] = haber["kaynak_site"]
+
+    # datetime nesnelerini string'e çevir
+    if haber.get("olusturma_tarihi"):
+        try:
+            haber["olusturma_tarihi"] = haber["olusturma_tarihi"].isoformat()
+        except AttributeError:
+            pass
+    if haber.get("guncelleme_tarihi"):
+        try:
+            haber["guncelleme_tarihi"] = haber["guncelleme_tarihi"].isoformat()
+        except AttributeError:
+            pass
+
+    return haber
+
+
 @api_bp.route("/haberler", methods=["GET"])
 def haberleri_getir():
     """
@@ -67,14 +118,8 @@ def haberleri_getir():
                 filtre["konum_metni"] = {"$regex": ilce, "$options": "i"}
             haberler = db.tum_haberleri_getir(filtre)
 
-        # datetime nesnelerini string'e çevir
-        for haber in haberler:
-            if haber.get("yayin_tarihi"):
-                haber["yayin_tarihi"] = haber["yayin_tarihi"].isoformat()
-            if haber.get("olusturma_tarihi"):
-                haber["olusturma_tarihi"] = haber["olusturma_tarihi"].isoformat()
-            if haber.get("guncelleme_tarihi"):
-                haber["guncelleme_tarihi"] = haber["guncelleme_tarihi"].isoformat()
+        # Haberleri frontend formatına dönüştür
+        haberler = [_haber_formatla(h) for h in haberler]
 
         return jsonify({
             "basarili": True,
@@ -102,8 +147,7 @@ def haber_detay(haber_id):
             return jsonify({"hata": "Haber bulunamadı"}), 404
 
         haber["_id"] = str(haber["_id"])
-        if haber.get("yayin_tarihi"):
-            haber["yayin_tarihi"] = haber["yayin_tarihi"].isoformat()
+        haber = _haber_formatla(haber)
 
         return jsonify({"basarili": True, "haber": haber})
 
