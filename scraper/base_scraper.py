@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 from config.settings import Config
 
@@ -55,7 +56,8 @@ class BaseScraper(ABC):
             BeautifulSoup: Ayrıştırılmış HTML nesnesi veya None
         """
         try:
-            time.sleep(self.gecikme)  # Rate limiting
+            if self.gecikme > 0:
+                time.sleep(self.gecikme)  # Rate limiting
 
             response = self.session.get(url, timeout=self.timeout)
             response.raise_for_status()
@@ -265,30 +267,54 @@ class BaseScraper(ABC):
 
         try:
             haber_linkleri = self.haber_listesi_getir()
+
+            # Performans için kaynak başına üst sınır uygula
+            max_link = getattr(Config, "SCRAPER_MAX_LINKS_PER_SOURCE", 50)
+            if isinstance(max_link, int) and max_link > 0:
+                haber_linkleri = haber_linkleri[:max_link]
+
             logger.info(
                 f"{self.kaynak_adi} - {len(haber_linkleri)} haber linki bulundu."
             )
 
-            for link in haber_linkleri:
+            def _tek_haber_cek(link: str) -> dict:
                 try:
                     haber = self.haber_detay_getir(link)
                     if haber and haber.get("baslik"):
                         # Son N gün kontrolü - tarihi yoksa haberi yine de dahil et
                         if haber.get("yayin_tarihi"):
                             if not self.son_n_gun_icinde_mi(haber["yayin_tarihi"]):
-                                continue
+                                return None
                         # Tarih yoksa güncel kabul et (yakın zamanlı haber olma ihtimali yüksek)
 
                         haber["kaynak_site"] = self.kaynak_adi
                         haber["haber_linki"] = link
                         haber["diger_kaynaklar"] = []
-                        haberler.append(haber)
+                        return haber
 
                 except Exception as e:
                     logger.error(
                         f"{self.kaynak_adi} - Haber detay hatası: {link} - {e}"
                     )
-                    continue
+                    return None
+
+                return None
+
+            max_workers = max(1, int(getattr(Config, "SCRAPER_MAX_WORKERS", 8)))
+
+            # Küçük listelerde thread maliyetine gerek yok
+            if max_workers == 1 or len(haber_linkleri) < 6:
+                for link in haber_linkleri:
+                    sonuc = _tek_haber_cek(link)
+                    if sonuc:
+                        haberler.append(sonuc)
+            else:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    gelecektekiler = [executor.submit(_tek_haber_cek, link) for link in haber_linkleri]
+                    for gelecek in as_completed(gelecektekiler):
+                        sonuc = gelecek.result()
+                        if sonuc:
+                            haberler.append(sonuc)
 
         except Exception as e:
             logger.error(f"{self.kaynak_adi} - Genel hata: {e}")
