@@ -154,6 +154,25 @@ function haberleriHaritayaEkle(haberListesi) {
 }
 
 /**
+ * Haber türüne göre farklı marker sembolü (SVG path) döndürür.
+ * Her haber türü haritada hem renk hem şekil ile ayırt edilir.
+ */
+const MARKER_SYMBOLS = {
+    // Trafik Kazası → Üçgen (uyarı sembolü)
+    trafik_kazasi: 'M 0,-10 L 8,6 L -8,6 Z',
+    // Yangın → Elmas / Baklava
+    yangin: 'M 0,-10 L 7,0 L 0,10 L -7,0 Z',
+    // Hırsızlık → Kare
+    hirsizlik: 'M -7,-7 L 7,-7 L 7,7 L -7,7 Z',
+    // Elektrik Kesintisi → Yıldız (şimşek)
+    elektrik_kesintisi: 'M 0,-10 L 3,-3 L 10,-3 L 5,2 L 7,10 L 0,5 L -7,10 L -5,2 L -10,-3 L -3,-3 Z',
+    // Kültürel Etkinlikler → Yuvarlak kare (rounded)
+    kulturel_etkinlik: 'M -5,-8 L 5,-8 L 8,-5 L 8,5 L 5,8 L -5,8 L -8,5 L -8,-5 Z',
+    // Diğer → Daire
+    diger: null  // null = google.maps.SymbolPath.CIRCLE kullan
+};
+
+/**
  * Tek bir haber için marker oluşturur
  */
 function markerOlustur(haber) {
@@ -163,14 +182,17 @@ function markerOlustur(haber) {
         label: 'Diğer'
     };
 
-    // SVG tabanlı özel marker ikonu
+    // Haber türüne göre farklı sembol seç
+    const symbolPath = MARKER_SYMBOLS[haber.haber_turu] || null;
+
+    // SVG tabanlı özel marker ikonu — her tür farklı şekil + renk
     const markerIcon = {
-        path: google.maps.SymbolPath.CIRCLE,
+        path: symbolPath !== null ? symbolPath : google.maps.SymbolPath.CIRCLE,
         fillColor: turBilgi.color,
         fillOpacity: 0.9,
         strokeColor: '#ffffff',
         strokeWeight: 2,
-        scale: 10
+        scale: symbolPath !== null ? 1.2 : 10
     };
 
     const marker = new google.maps.Marker({
