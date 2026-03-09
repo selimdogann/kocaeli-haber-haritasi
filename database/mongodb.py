@@ -191,10 +191,15 @@ class MongoDB:
         filtre = {}
 
         if haber_turu:
-            filtre["haber_turu"] = haber_turu
+            # Virgülle ayrılmış birden fazla tür desteği
+            turler = [t.strip() for t in haber_turu.split(",") if t.strip()]
+            if len(turler) == 1:
+                filtre["haber_turu"] = turler[0]
+            elif len(turler) > 1:
+                filtre["haber_turu"] = {"$in": turler}
 
         if ilce:
-            filtre["konum_metni"] = {"$regex": ilce, "$options": "i"}
+            filtre["ilce"] = {"$regex": ilce, "$options": "i"}
 
         if baslangic_tarihi or bitis_tarihi:
             tarih_filtre = {}
