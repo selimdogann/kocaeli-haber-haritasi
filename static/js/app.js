@@ -177,46 +177,98 @@ function haberleriHaritayaEkle(haberListesi) {
 }
 
 /**
- * Haber türüne göre farklı marker sembolü (SVG path) döndürür.
- * Her haber türü haritada hem renk hem şekil ile ayırt edilir.
+ * Pin şeklinde SVG marker ikonu oluşturur.
+ * Her haber türü için renkli pin + beyaz simge.
  */
-const MARKER_SYMBOLS = {
-    // Trafik Kazası → Üçgen (uyarı sembolü)
-    trafik_kazasi: 'M 0,-10 L 8,6 L -8,6 Z',
-    // Yangın → Elmas / Baklava
-    yangin: 'M 0,-10 L 7,0 L 0,10 L -7,0 Z',
-    // Hırsızlık → Kare
-    hirsizlik: 'M -7,-7 L 7,-7 L 7,7 L -7,7 Z',
-    // Elektrik Kesintisi → Yıldız (şimşek)
-    elektrik_kesintisi: 'M 0,-10 L 3,-3 L 10,-3 L 5,2 L 7,10 L 0,5 L -7,10 L -5,2 L -10,-3 L -3,-3 Z',
-    // Kültürel Etkinlikler → Yuvarlak kare (rounded)
-    kulturel_etkinlik: 'M -5,-8 L 5,-8 L 8,-5 L 8,5 L 5,8 L -5,8 L -8,5 L -8,-5 Z',
-    // Diğer → Daire
-    diger: null  // null = google.maps.SymbolPath.CIRCLE kullan
-};
+function pinIkonuOlustur(renk, ikonSvg) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="44" viewBox="0 0 32 44">
+        <defs>
+            <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="#000" flood-opacity="0.35"/>
+            </filter>
+        </defs>
+        <path d="M16 43C16 43 31 26 31 15.5C31 7.2 24.3 0.5 16 0.5C7.7 0.5 1 7.2 1 15.5C1 26 16 43 16 43Z"
+              fill="${renk}" stroke="#fff" stroke-width="1.5" filter="url(#ds)"/>
+        <circle cx="16" cy="15" r="10" fill="rgba(255,255,255,0.2)"/>
+        ${ikonSvg}
+    </svg>`;
+    return {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+        scaledSize: new google.maps.Size(34, 46),
+        anchor: new google.maps.Point(17, 46),
+    };
+}
+
+/**
+ * Haber türüne göre pin ikonları — renkli pin + beyaz simge
+ * Referans: araba, alev, şimşek, kilit, nota, gazete
+ */
+let MARKER_ICONS = null;
+
+function markerIkonlariniHazirla() {
+    if (MARKER_ICONS) return;
+    MARKER_ICONS = {
+        // Trafik Kazası → Araba simgesi
+        trafik_kazasi: pinIkonuOlustur('#E53E3E',
+            `<g fill="#fff" transform="translate(16,15)">
+                <path d="M-7.5,0.5 L-5.5,-4 L5.5,-4 L7.5,0.5 L7.5,3 L-7.5,3 Z"/>
+                <rect x="-5" y="-3.5" width="3.5" height="2.5" rx="0.5" fill="#E53E3E" opacity="0.6"/>
+                <rect x="1.5" y="-3.5" width="3.5" height="2.5" rx="0.5" fill="#E53E3E" opacity="0.6"/>
+                <circle cx="-4.5" cy="4.2" r="1.6"/>
+                <circle cx="4.5" cy="4.2" r="1.6"/>
+            </g>`),
+
+        // Yangın → Alev simgesi
+        yangin: pinIkonuOlustur('#ED8936',
+            `<path d="M16,6.5 C16,6.5 11,11 11,15.5 C11,18.3 13.2,20.5 16,20.5
+                     C18.8,20.5 21,18.3 21,15.5 C21,11 16,6.5 16,6.5 Z" fill="#fff"/>
+             <path d="M16,12 C16,12 14,14 14,15.8 C14,16.9 14.9,17.8 16,17.8
+                     C17.1,17.8 18,16.9 18,15.8 C18,14 16,12 16,12 Z" fill="#ED8936"/>`),
+
+        // Hırsızlık → Kalkan simgesi
+        hirsizlik: pinIkonuOlustur('#805AD5',
+            `<g fill="#fff" transform="translate(16,15)">
+                <path d="M0,-8 L7,-4.5 L7,1 C7,5 4,7.5 0,9 C-4,7.5 -7,5 -7,1 L-7,-4.5 Z"/>
+                <path d="M0,-4.5 L4,-2.5 L4,0.8 C4,3.5 2,5 0,6 C-2,5 -4,3.5 -4,0.8 L-4,-2.5 Z" fill="#805AD5" opacity="0.45"/>
+            </g>`),
+
+        // Elektrik Kesintisi → Şimşek simgesi
+        elektrik_kesintisi: pinIkonuOlustur('#D69E2E',
+            `<polygon points="18,6 13,14.5 15.5,14.5 13,23 20,13.5 17,13.5 19,6" fill="#fff"/>`),
+
+        // Kültürel Etkinlik → Nota simgesi
+        kulturel_etkinlik: pinIkonuOlustur('#3182CE',
+            `<g fill="#fff" transform="translate(16,15)">
+                <ellipse cx="-3" cy="4.5" rx="3" ry="2.3"/>
+                <rect x="-0.3" y="-7" width="1.8" height="11.5"/>
+                <path d="M1.5,-7 L7,-9 L7,-4 L1.5,-2 Z"/>
+            </g>`),
+
+        // Diğer → Gazete/belge simgesi
+        diger: pinIkonuOlustur('#718096',
+            `<g fill="#fff" transform="translate(16,15)">
+                <rect x="-6" y="-7" width="12" height="14" rx="1.5"/>
+                <line x1="-3.5" y1="-4" x2="3.5" y2="-4" stroke="#718096" stroke-width="1.2"/>
+                <line x1="-3.5" y1="-1" x2="3.5" y2="-1" stroke="#718096" stroke-width="1.2"/>
+                <line x1="-3.5" y1="2" x2="1.5" y2="2" stroke="#718096" stroke-width="1.2"/>
+            </g>`),
+    };
+}
 
 /**
  * Tek bir haber için marker oluşturur
  */
 function markerOlustur(haber) {
+    markerIkonlariniHazirla();
+
     const turBilgi = CONFIG.newsTypes[haber.haber_turu] || {
         color: '#6B7280',
         icon: '📰',
         label: 'Diğer'
     };
 
-    // Haber türüne göre farklı sembol seç
-    const symbolPath = MARKER_SYMBOLS[haber.haber_turu] || null;
-
-    // SVG tabanlı özel marker ikonu — her tür farklı şekil + renk
-    const markerIcon = {
-        path: symbolPath !== null ? symbolPath : google.maps.SymbolPath.CIRCLE,
-        fillColor: turBilgi.color,
-        fillOpacity: 0.9,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-        scale: symbolPath !== null ? 1.2 : 10
-    };
+    // Haber türüne göre pin ikonu seç
+    const markerIcon = MARKER_ICONS[haber.haber_turu] || MARKER_ICONS['diger'];
 
     const marker = new google.maps.Marker({
         position: {
