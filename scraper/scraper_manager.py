@@ -22,6 +22,18 @@ from database.mongodb import MongoDB
 
 logger = logging.getLogger(__name__)
 
+# Global ilerleme durumu (thread-safe basit dict)
+scrape_progress = {
+    "aktif": False,
+    "aşama": "",
+    "kaynak": "",
+    "kaynak_no": 0,
+    "toplam_kaynak": 5,
+    "islenen_haber": 0,
+    "toplam_haber": 0,
+    "yuzde": 0,
+}
+
 
 class ScraperManager:
     """Tüm scraping sürecini yöneten ana sınıf."""
@@ -86,6 +98,16 @@ class ScraperManager:
 
         tum_haberler = []
 
+        # İlerleme durumunu başlat
+        scrape_progress["aktif"] = True
+        scrape_progress["aşama"] = "Hazırlanıyor..."
+        scrape_progress["kaynak"] = ""
+        scrape_progress["kaynak_no"] = 0
+        scrape_progress["toplam_kaynak"] = len(self.scraperlar)
+        scrape_progress["islenen_haber"] = 0
+        scrape_progress["toplam_haber"] = 0
+        scrape_progress["yuzde"] = 0
+
         # 0. Performans için mevcut haber/cache hazırlığı
         if self.db:
             self._mevcut_haberler_cache = self.db.tum_haber_metinlerini_getir()
@@ -105,8 +127,12 @@ class ScraperManager:
                 )
 
         # 1. Tüm kaynaklardan haberleri çek
-        for scraper in self.scraperlar:
+        for idx, scraper in enumerate(self.scraperlar):
             try:
+                scrape_progress["aşama"] = "Haberler çekiliyor"
+                scrape_progress["kaynak"] = scraper.kaynak_adi
+                scrape_progress["kaynak_no"] = idx + 1
+                scrape_progress["yuzde"] = int((idx / len(self.scraperlar)) * 50)
                 logger.info(f"🔄 {scraper.kaynak_adi} haberleri çekiliyor...")
                 haberler = scraper.tum_haberleri_cek()
                 tum_haberler.extend(haberler)
@@ -125,8 +151,13 @@ class ScraperManager:
         logger.info(f"📊 Toplam {len(tum_haberler)} haber çekildi.")
 
         # 2. Her haberi işle ve kaydet
-        for haber in tum_haberler:
+        scrape_progress["aşama"] = "Haberler işleniyor"
+        scrape_progress["toplam_haber"] = len(tum_haberler)
+        scrape_progress["yuzde"] = 50
+        for i, haber in enumerate(tum_haberler):
             try:
+                scrape_progress["islenen_haber"] = i + 1
+                scrape_progress["yuzde"] = 50 + int((i / max(len(tum_haberler), 1)) * 50)
                 sonuc = self._haber_isle_ve_kaydet(haber)
 
                 if sonuc == "kaydedildi":
@@ -147,6 +178,11 @@ class ScraperManager:
         bitis = datetime.now()
         rapor["bitis_zamani"] = bitis.isoformat()
         rapor["sure_saniye"] = (bitis - baslangic).total_seconds()
+
+        # İlerleme durumunu sıfırla
+        scrape_progress["aktif"] = False
+        scrape_progress["aşama"] = "Tamamlandı"
+        scrape_progress["yuzde"] = 100
 
         logger.info(
             f"✅ Scraping tamamlandı: "

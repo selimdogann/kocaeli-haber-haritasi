@@ -185,12 +185,13 @@ body {
     border-bottom: 1px solid var(--gray-100);
 }
 
-.filter-header h.05rem;
+.filter-header h2 {
+    font-size: 1.05rem;
     font-weight: 700;
     background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    background-clip: text
+    background-clip: text;
     color: var(--gray-800);
 }
 

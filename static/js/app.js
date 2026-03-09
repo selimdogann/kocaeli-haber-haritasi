@@ -103,13 +103,34 @@ async function istatistikleriGetir() {
 /**
  * Scraping işlemini başlatır
  */
+let progressInterval = null;
+
 async function scrapingBaslat() {
     const btn = document.getElementById('btn-scrape');
     btn.disabled = true;
-    btn.innerHTML = '⏳ Çekiliyor...';
+    btn.innerHTML = '⏳ Başlatılıyor...';
 
     loadingGoster(true);
     bildirimGoster('Haber çekme işlemi başlatıldı, lütfen bekleyiniz...', 'uyari');
+
+    // İlerleme takibini başlat
+    progressInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/scrape/progress');
+            const p = await res.json();
+            if (p.aktif) {
+                let text = `⏳ %${p.yuzde}`;
+                if (p.asama === 'Haberler çekiliyor') {
+                    text += ` · ${p.kaynak} (${p.kaynak_no}/${p.toplam_kaynak})`;
+                } else if (p.asama === 'Haberler işleniyor') {
+                    text += ` · İşleniyor ${p.islenen_haber}/${p.toplam_haber}`;
+                } else {
+                    text += ` · ${p.asama}`;
+                }
+                btn.innerHTML = text;
+            }
+        } catch (e) { /* ignore */ }
+    }, 800);
 
     try {
         const response = await fetch('/api/scrape', {
@@ -121,7 +142,7 @@ async function scrapingBaslat() {
         if (data.basarili) {
             const rapor = data.rapor;
             bildirimGoster(
-                `✅ Tamamlandı! ${rapor.toplam_kaydedilen} yeni haber eklendi (${rapor.toplam_cekilen} tarandı)`,
+                `✅ Tamamlandı! ${rapor.toplam_kaydedilen} yeni haber eklendi (${rapor.toplam_cekilen} tarandı, ${rapor.sure_saniye.toFixed(0)}s)`,
                 'basarili'
             );
             // Haberleri ve istatistikleri yenile
@@ -134,6 +155,8 @@ async function scrapingBaslat() {
         console.error('Scraping hatası:', error);
         bildirimGoster('Sunucuyla bağlantı kurulamadı', 'hata');
     } finally {
+        clearInterval(progressInterval);
+        progressInterval = null;
         btn.disabled = false;
         btn.innerHTML = '🔄 Haberleri Güncelle';
         loadingGoster(false);
