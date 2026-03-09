@@ -89,6 +89,12 @@ class Config:
             "icon": "🎭",
             "marker_color": "blue",
         },
+        "diger": {
+            "label": "Diğer",
+            "color": "#808080",
+            "icon": "📰",
+            "marker_color": "gray",
+        },
     }
 
     # Benzerlik Eşik Değeri
