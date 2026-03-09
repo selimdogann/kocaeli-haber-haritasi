@@ -58,7 +58,7 @@ async function haberleriGetir() {
         const response = await fetch(`/api/haberler?${queryString}`);
         const data = await response.json();
 
-        if (data.durum === 'basarili') {
+        if (data.basarili) {
             haberler = data.haberler;
 
             // Haritadaki markerları güncelle
@@ -85,7 +85,7 @@ async function istatistikleriGetir() {
         const response = await fetch('/api/istatistikler');
         const data = await response.json();
 
-        if (data.durum === 'basarili') {
+        if (data.basarili) {
             const stats = data.istatistikler;
 
             // Toplam ve konumlu sayıları güncelle
@@ -118,10 +118,10 @@ async function scrapingBaslat() {
         });
         const data = await response.json();
 
-        if (data.durum === 'basarili') {
+        if (data.basarili) {
             const rapor = data.rapor;
             bildirimGoster(
-                `✅ Tamamlandı! ${rapor.toplam_yeni_haber} yeni haber eklendi (${rapor.toplam_taranan} tarandı)`,
+                `✅ Tamamlandı! ${rapor.toplam_kaydedilen} yeni haber eklendi (${rapor.toplam_cekilen} tarandı)`,
                 'basarili'
             );
             // Haberleri ve istatistikleri yenile
@@ -279,7 +279,7 @@ function filtreParametreleriOlustur() {
     // Eğer tüm türler seçili değilse, sadece seçili olanları gönder
     const tumCheckboxlar = document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]');
     if (seciliTurler.length < tumCheckboxlar.length && seciliTurler.length > 0) {
-        params.tur = seciliTurler.join(',');
+        params.haber_turu = seciliTurler.join(',');
     }
 
     // İlçe filtresi
@@ -289,8 +289,8 @@ function filtreParametreleriOlustur() {
     // Tarih filtresi
     const baslangic = document.getElementById('baslangic-tarihi').value;
     const bitis = document.getElementById('bitis-tarihi').value;
-    if (baslangic) params.baslangic = baslangic;
-    if (bitis) params.bitis = bitis;
+    if (baslangic) params.baslangic_tarihi = baslangic;
+    if (bitis) params.bitis_tarihi = bitis;
 
     return params;
 }
