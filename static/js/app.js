@@ -1,66 +1,63 @@
 /* =============================================
    KOCAELI HABER HARİTASI - ANA JAVASCRIPT DOSYASI
-   Leaflet Harita Entegrasyonu & API İletişimi
+   Google Maps Entegrasyonu & API İletişimi
    ============================================= */
 
 // ==================== GLOBAL DEĞİŞKENLER ====================
 let map;
 let markers = [];
+let infoWindow;
 let haberler = [];
 
 // ==================== HARİTA BAŞLATMA ====================
 function initMap() {
-    // Leaflet harita nesnesini oluştur
-    map = L.map('map', {
-        center: [CONFIG.centerLat, CONFIG.centerLng],
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: CONFIG.centerLat, lng: CONFIG.centerLng },
         zoom: 11,
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+            position: google.maps.ControlPosition.TOP_RIGHT
+        },
+        streetViewControl: false,
+        fullscreenControl: true,
         zoomControl: true,
+        zoomControlOptions: {
+            position: google.maps.ControlPosition.RIGHT_CENTER
+        },
+        styles: [
+            { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+        ]
     });
 
-    // OpenStreetMap tile katmanı
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-    }).addTo(map);
+    infoWindow = new google.maps.InfoWindow();
 
-    // Sayfa yüklendiğinde haberleri getir
     haberleriGetir();
     istatistikleriGetir();
 }
 
-// Sayfa yüklendiğinde haritayı başlat
-document.addEventListener('DOMContentLoaded', initMap);
-
 // ==================== SVG PIN İKON OLUŞTURUCU ====================
 
-/**
- * Pin şeklinde SVG marker ikonu oluşturur (Leaflet L.divIcon).
- * Her haber türü için renkli pin + beyaz simge.
- */
 function pinSvgOlustur(renk, ikonSvg) {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
         <defs>
-            <filter id="s${renk.replace('#','')}" x="-20%" y="-10%" width="140%" height="130%">
+            <filter id="s" x="-20%" y="-10%" width="140%" height="130%">
                 <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
             </filter>
         </defs>
         <path d="M18 47C18 47 34 28 34 16.5C34 7.9 26.8 1 18 1C9.2 1 2 7.9 2 16.5C2 28 18 47 18 47Z"
-              fill="${renk}" stroke="#fff" stroke-width="2" filter="url(#s${renk.replace('#','')})"/>
+              fill="${renk}" stroke="#fff" stroke-width="2" filter="url(#s)"/>
         <circle cx="18" cy="16" r="11" fill="rgba(255,255,255,0.25)"/>
         ${ikonSvg}
     </svg>`;
 }
 
-/**
- * Haber türüne göre Leaflet ikon nesnesi döndürür
- */
-const MARKER_SVG_MAP = {};
+let MARKER_ICONS = null;
 
-function markerIkonuGetir(haberTuru) {
-    if (MARKER_SVG_MAP[haberTuru]) return MARKER_SVG_MAP[haberTuru];
+function markerIkonlariniHazirla() {
+    if (MARKER_ICONS) return;
 
     const ikonlar = {
-        // Trafik Kazası → Araba simgesi (kırmızı)
         trafik_kazasi: pinSvgOlustur('#E53E3E',
             `<g fill="#fff" transform="translate(18,16)">
                 <path d="M-8,0.5 L-6,-4.5 L6,-4.5 L8,0.5 L8,3 L-8,3 Z"/>
@@ -70,14 +67,12 @@ function markerIkonuGetir(haberTuru) {
                 <circle cx="5" cy="4.5" r="1.8" fill="#fff"/>
             </g>`),
 
-        // Yangın → Alev simgesi (turuncu)
         yangin: pinSvgOlustur('#ED8936',
             `<path d="M18,7 C18,7 12.5,12.5 12.5,16.5 C12.5,19.5 14.9,22 18,22
                      C21.1,22 23.5,19.5 23.5,16.5 C23.5,12.5 18,7 18,7 Z" fill="#fff"/>
              <path d="M18,13 C18,13 15.8,15.2 15.8,16.8 C15.8,18 16.8,19 18,19
                      C19.2,19 20.2,18 20.2,16.8 C20.2,15.2 18,13 18,13 Z" fill="#ED8936"/>`),
 
-        // Hırsızlık → Kalkan simgesi (mor)
         hirsizlik: pinSvgOlustur('#805AD5',
             `<g fill="#fff" transform="translate(18,16)">
                 <path d="M0,-9 L8,-5 L8,1 C8,5.5 4.5,8.5 0,10 C-4.5,8.5 -8,5.5 -8,1 L-8,-5 Z"/>
@@ -85,11 +80,9 @@ function markerIkonuGetir(haberTuru) {
                       fill="#805AD5" opacity="0.4"/>
             </g>`),
 
-        // Elektrik Kesintisi → Şimşek simgesi (sarı)
         elektrik_kesintisi: pinSvgOlustur('#D69E2E',
             `<polygon points="20,6.5 14.5,15.5 17.5,15.5 14.5,25 22,14 18.5,14 21,6.5" fill="#fff"/>`),
 
-        // Kültürel Etkinlik → Nota simgesi (mavi)
         kulturel_etkinlik: pinSvgOlustur('#3182CE',
             `<g fill="#fff" transform="translate(18,16)">
                 <ellipse cx="-3.5" cy="5" rx="3.5" ry="2.5"/>
@@ -97,7 +90,6 @@ function markerIkonuGetir(haberTuru) {
                 <path d="M1.7,-8 L8,-10 L8,-4.5 L1.7,-2.5 Z"/>
             </g>`),
 
-        // Diğer → Gazete/belge simgesi (gri)
         diger: pinSvgOlustur('#718096',
             `<g fill="#fff" transform="translate(18,16)">
                 <rect x="-6.5" y="-8" width="13" height="16" rx="2"/>
@@ -108,41 +100,30 @@ function markerIkonuGetir(haberTuru) {
             </g>`),
     };
 
-    const svgHtml = ikonlar[haberTuru] || ikonlar['diger'];
-
-    const ikon = L.divIcon({
-        html: svgHtml,
-        className: 'leaflet-pin-icon',
-        iconSize: [36, 48],
-        iconAnchor: [18, 48],
-        popupAnchor: [0, -48],
-    });
-
-    MARKER_SVG_MAP[haberTuru] = ikon;
-    return ikon;
+    MARKER_ICONS = {};
+    for (const [tur, svg] of Object.entries(ikonlar)) {
+        MARKER_ICONS[tur] = {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+            scaledSize: new google.maps.Size(36, 48),
+            anchor: new google.maps.Point(18, 48),
+        };
+    }
 }
 
 // ==================== API İSTEKLERİ ====================
 
-/**
- * Haberleri API'den çeker ve haritaya yerleştirir
- */
 async function haberleriGetir() {
     try {
         const params = filtreParametreleriOlustur();
         const queryString = new URLSearchParams(params).toString();
-
         const response = await fetch(`/api/haberler?${queryString}`);
         const data = await response.json();
 
         if (data.basarili) {
             haberler = data.haberler;
-
             markerlariTemizle();
             haberleriHaritayaEkle(haberler);
-
             haberListesiniGuncelle(haberler);
-
             document.getElementById('toplam-haber-sayisi').textContent = data.toplam;
         }
     } catch (error) {
@@ -151,14 +132,10 @@ async function haberleriGetir() {
     }
 }
 
-/**
- * İstatistikleri API'den çeker
- */
 async function istatistikleriGetir() {
     try {
         const response = await fetch('/api/istatistikler');
         const data = await response.json();
-
         if (data.basarili) {
             const stats = data.istatistikler;
             document.getElementById('stat-toplam').textContent = stats.toplam_haber || 0;
@@ -170,20 +147,15 @@ async function istatistikleriGetir() {
     }
 }
 
-/**
- * Scraping işlemini başlatır
- */
 let progressInterval = null;
 
 async function scrapingBaslat() {
     const btn = document.getElementById('btn-scrape');
     btn.disabled = true;
     btn.innerHTML = '⏳ Başlatılıyor...';
-
     loadingGoster(true);
     bildirimGoster('Haber çekme işlemi başlatıldı, lütfen bekleyiniz...', 'uyari');
 
-    // İlerleme takibini başlat
     progressInterval = setInterval(async () => {
         try {
             const res = await fetch('/api/scrape/progress');
@@ -199,22 +171,15 @@ async function scrapingBaslat() {
                 }
                 btn.innerHTML = text;
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) {}
     }, 800);
 
     try {
-        const response = await fetch('/api/scrape', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
+        const response = await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
         const data = await response.json();
-
         if (data.basarili) {
             const rapor = data.rapor;
-            bildirimGoster(
-                `✅ Tamamlandı! ${rapor.toplam_kaydedilen} yeni haber eklendi (${rapor.toplam_cekilen} tarandı, ${rapor.sure_saniye.toFixed(0)}s)`,
-                'basarili'
-            );
+            bildirimGoster(`✅ Tamamlandı! ${rapor.toplam_kaydedilen} yeni haber eklendi (${rapor.toplam_cekilen} tarandı, ${rapor.sure_saniye.toFixed(0)}s)`, 'basarili');
             await haberleriGetir();
             await istatistikleriGetir();
         } else {
@@ -234,9 +199,6 @@ async function scrapingBaslat() {
 
 // ==================== HARİTA İŞLEMLERİ ====================
 
-/**
- * Haberleri harita üzerinde marker olarak gösterir
- */
 function haberleriHaritayaEkle(haberListesi) {
     haberListesi.forEach(haber => {
         if (haber.koordinatlar && haber.koordinatlar.lat && haber.koordinatlar.lng) {
@@ -245,50 +207,34 @@ function haberleriHaritayaEkle(haberListesi) {
     });
 }
 
-/**
- * Tek bir haber için marker oluşturur
- */
 function markerOlustur(haber) {
-    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || {
-        color: '#6B7280',
-        icon: '📰',
-        label: 'Diğer'
-    };
+    markerIkonlariniHazirla();
 
-    const ikon = markerIkonuGetir(haber.haber_turu);
+    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
+    const ikon = MARKER_ICONS[haber.haber_turu] || MARKER_ICONS['diger'];
 
-    const marker = L.marker(
-        [haber.koordinatlar.lat, haber.koordinatlar.lng],
-        { icon: ikon }
-    ).addTo(map);
+    const marker = new google.maps.Marker({
+        position: { lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng },
+        map: map,
+        icon: ikon,
+        title: haber.baslik,
+        animation: google.maps.Animation.DROP
+    });
 
-    // Marker'a haber verisini ekle
     marker.haberData = haber;
 
-    // Popup içeriğini oluştur ve bağla
-    const popupIcerik = popupIcerikOlustur(haber, turBilgi);
-    marker.bindPopup(popupIcerik, {
-        maxWidth: 320,
-        minWidth: 240,
-        className: 'haber-popup',
+    marker.addListener('click', () => {
+        infoWindowAc(marker, haber);
     });
 
     markers.push(marker);
 }
 
-/**
- * Popup (bilgi penceresi) içeriğini oluşturur
- */
-function popupIcerikOlustur(haber, turBilgi) {
+function infoWindowAc(marker, haber) {
+    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
     const tarih = haber.tarih ? tarihFormatla(haber.tarih) : 'Tarih bilinmiyor';
-
-    const kaynaklar = haber.kaynaklar ?
-        haber.kaynaklar.map(k => k.kaynak_adi).join(', ') :
-        (haber.kaynak_adi || '');
-
-    const icerikOzet = haber.icerik ?
-        haber.icerik.substring(0, 150) + (haber.icerik.length > 150 ? '...' : '') :
-        '';
+    const kaynaklar = haber.kaynaklar ? haber.kaynaklar.map(k => k.kaynak_adi).join(', ') : (haber.kaynak_adi || '');
+    const icerikOzet = haber.icerik ? haber.icerik.substring(0, 150) + (haber.icerik.length > 150 ? '...' : '') : '';
 
     const konum = [];
     if (haber.konum_bilgisi) {
@@ -297,79 +243,63 @@ function popupIcerikOlustur(haber, turBilgi) {
     }
     const konumMetni = konum.length > 0 ? konum.join(', ') : 'Kocaeli';
 
-    const haberLinki = haber.haber_linki ||
-        (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].link : '#');
+    const haberLinki = haber.haber_linki || (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].link : '#');
 
-    return `
-        <div class="popup-content">
-            <div class="popup-title">${escapeHtml(haber.baslik)}</div>
-            <div class="popup-meta">
-                <span class="popup-tag" style="background-color: ${turBilgi.color}">
+    const icerik = `
+        <div style="font-family:'Inter',sans-serif;max-width:320px;">
+            <div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:8px;line-height:1.4;">
+                ${escapeHtml(haber.baslik)}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-size:12px;color:#475569;">
+                <span style="display:inline-block;padding:3px 10px;border-radius:6px;color:#fff;font-size:11px;font-weight:600;background:${turBilgi.color};width:fit-content;">
                     ${turBilgi.icon} ${turBilgi.label}
                 </span>
                 <span>📅 ${tarih}</span>
                 <span>📍 ${escapeHtml(konumMetni)}</span>
                 ${kaynaklar ? `<span>📰 ${escapeHtml(kaynaklar)}</span>` : ''}
             </div>
-            ${icerikOzet ? `<div class="popup-excerpt">${escapeHtml(icerikOzet)}</div>` : ''}
-            <a href="${escapeHtml(haberLinki)}" target="_blank" rel="noopener" class="popup-link">
-                🔗 Habere Git &rarr;
+            ${icerikOzet ? `<div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:10px;">${escapeHtml(icerikOzet)}</div>` : ''}
+            <a href="${escapeHtml(haberLinki)}" target="_blank" rel="noopener"
+               style="display:block;text-align:center;background:#2563eb;color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">
+                Habere Git &rarr;
             </a>
         </div>
     `;
+
+    infoWindow.setContent(icerik);
+    infoWindow.open(map, marker);
 }
 
-/**
- * Tüm markerları haritadan kaldırır
- */
 function markerlariTemizle() {
-    markers.forEach(marker => map.removeLayer(marker));
+    markers.forEach(marker => marker.setMap(null));
     markers = [];
 }
 
 // ==================== FİLTRE İŞLEMLERİ ====================
 
-/**
- * Aktif filtreleri bir parametre nesnesi olarak döndürür
- */
 function filtreParametreleriOlustur() {
     const params = {};
-
     const seciliTurler = [];
     document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]:checked').forEach(cb => {
         seciliTurler.push(cb.value);
     });
-
     const tumCheckboxlar = document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]');
     if (seciliTurler.length < tumCheckboxlar.length && seciliTurler.length > 0) {
         params.haber_turu = seciliTurler.join(',');
     }
-
     const ilce = document.getElementById('ilce-filtre').value;
     if (ilce) params.ilce = ilce;
-
     const baslangic = document.getElementById('baslangic-tarihi').value;
     const bitis = document.getElementById('bitis-tarihi').value;
     if (baslangic) params.baslangic_tarihi = baslangic;
     if (bitis) params.bitis_tarihi = bitis;
-
     return params;
 }
 
-/**
- * Filtreleri uygular
- */
-function filtreUygula() {
-    haberleriGetir();
-}
+function filtreUygula() { haberleriGetir(); }
 
-/**
- * Tüm filtreleri sıfırlar
- */
 function filtreleriTemizle() {
-    document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]').forEach(cb => {
-        cb.checked = true;
-    });
+    document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]').forEach(cb => { cb.checked = true; });
     document.getElementById('ilce-filtre').value = '';
     document.getElementById('baslangic-tarihi').value = '';
     document.getElementById('bitis-tarihi').value = '';
@@ -378,27 +308,17 @@ function filtreleriTemizle() {
 
 // ==================== UI GÜNCELLEME ====================
 
-/**
- * Sol paneldeki haber listesini günceller
- */
 function haberListesiniGuncelle(haberListesi) {
     const container = document.getElementById('haber-listesi');
-
     if (haberListesi.length === 0) {
         container.innerHTML = '<p class="loading-text">Gösterilecek haber bulunamadı.</p>';
         return;
     }
-
     let html = '';
     haberListesi.forEach((haber, index) => {
-        const turBilgi = CONFIG.newsTypes[haber.haber_turu] || {
-            color: '#6B7280',
-            icon: '📰',
-            label: 'Diğer'
-        };
+        const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
         const tarih = haber.tarih ? tarihFormatla(haber.tarih) : '';
         const kaynak = haber.kaynak_adi || (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].kaynak_adi : '');
-
         html += `
             <div class="haber-card" style="border-left-color: ${turBilgi.color}"
                  onclick="habereTikla(${index})" title="${escapeHtml(haber.baslik)}">
@@ -413,57 +333,34 @@ function haberListesiniGuncelle(haberListesi) {
             </div>
         `;
     });
-
     container.innerHTML = html;
 }
 
-/**
- * Haber kartına tıklandığında haritayı o habere odaklar
- */
 function habereTikla(index) {
     const haber = haberler[index];
     if (!haber) return;
-
     if (haber.koordinatlar && haber.koordinatlar.lat && haber.koordinatlar.lng) {
-        // Haritayı haberin konumuna taşı
-        map.setView([haber.koordinatlar.lat, haber.koordinatlar.lng], 14, {
-            animate: true,
-            duration: 0.5
-        });
-
-        // İlgili markerı bul ve popup aç
-        const marker = markers.find(m =>
-            m.haberData && m.haberData._id === haber._id
-        );
+        map.panTo({ lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng });
+        map.setZoom(14);
+        const marker = markers.find(m => m.haberData && m.haberData._id === haber._id);
         if (marker) {
-            marker.openPopup();
+            infoWindowAc(marker, haber);
+            marker.setAnimation(google.maps.Animation.BOUNCE);
+            setTimeout(() => marker.setAnimation(null), 1500);
         }
     } else {
         bildirimGoster('Bu haberin konum bilgisi bulunamadı', 'uyari');
     }
 }
 
-/**
- * Tür dağılımı grafiğini oluşturur
- */
 function turDagilimiOlustur(dagilim) {
     const container = document.getElementById('tur-dagilimi');
-    if (!dagilim || Object.keys(dagilim).length === 0) {
-        container.innerHTML = '';
-        return;
-    }
-
+    if (!dagilim || Object.keys(dagilim).length === 0) { container.innerHTML = ''; return; }
     const maxDeger = Math.max(...Object.values(dagilim), 1);
-
     let html = '';
     for (const [turId, sayi] of Object.entries(dagilim)) {
-        const turBilgi = CONFIG.newsTypes[turId] || {
-            color: '#6B7280',
-            icon: '📰',
-            label: turId
-        };
+        const turBilgi = CONFIG.newsTypes[turId] || { color: '#6B7280', icon: '📰', label: turId };
         const yuzde = (sayi / maxDeger) * 100;
-
         html += `
             <div class="tur-bar">
                 <span class="tur-bar-label">${turBilgi.icon} ${turBilgi.label}</span>
@@ -474,7 +371,6 @@ function turDagilimiOlustur(dagilim) {
             </div>
         `;
     }
-
     container.innerHTML = html;
 }
 
@@ -496,14 +392,8 @@ function tarihFormatla(tarihStr) {
     try {
         const tarih = new Date(tarihStr);
         if (isNaN(tarih.getTime())) return tarihStr;
-        return tarih.toLocaleDateString('tr-TR', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-        });
-    } catch {
-        return tarihStr;
-    }
+        return tarih.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch { return tarihStr; }
 }
 
 function escapeHtml(text) {

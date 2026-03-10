@@ -8,14 +8,6 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-          crossorigin=""/>
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
 </head>
 <body>
 
@@ -40,13 +32,11 @@
 
         <!-- SOL PANEL - FİLTRELER -->
         <aside class="sidebar">
-            <!-- Filtre Başlığı -->
             <div class="filter-header">
                 <h2>📋 Filtreler</h2>
                 <button class="btn btn-sm btn-outline" onclick="filtreleriTemizle()">Temizle</button>
             </div>
 
-            <!-- Haber Türü Filtresi -->
             <div class="filter-group">
                 <label class="filter-label">Haber Türü</label>
                 <div class="checkbox-group" id="haber-turu-filtre">
@@ -60,7 +50,6 @@
                 </div>
             </div>
 
-            <!-- İlçe Filtresi -->
             <div class="filter-group">
                 <label class="filter-label">İlçe</label>
                 <select id="ilce-filtre" class="filter-select" onchange="filtreUygula()">
@@ -71,7 +60,6 @@
                 </select>
             </div>
 
-            <!-- Tarih Filtresi -->
             <div class="filter-group">
                 <label class="filter-label">Tarih Aralığı</label>
                 <div class="date-inputs">
@@ -81,7 +69,6 @@
                 </div>
             </div>
 
-            <!-- İstatistikler -->
             <div class="filter-group stats-group">
                 <label class="filter-label">📊 İstatistikler</label>
                 <div id="istatistikler" class="stats-container">
@@ -94,12 +81,9 @@
                         <span class="stat-value" id="stat-konumlu">-</span>
                     </div>
                 </div>
-
-                <!-- Tür dağılımı -->
                 <div id="tur-dagilimi" class="tur-dagilimi"></div>
             </div>
 
-            <!-- Haber Listesi -->
             <div class="filter-group haber-listesi-group">
                 <label class="filter-label">📰 Haberler</label>
                 <div id="haber-listesi" class="haber-listesi">
@@ -111,8 +95,6 @@
         <!-- HARİTA -->
         <div class="map-container">
             <div id="map" class="map"></div>
-
-            <!-- Yükleniyor Göstergesi -->
             <div id="loading-overlay" class="loading-overlay" style="display: none;">
                 <div class="spinner"></div>
                 <p>İşlem devam ediyor...</p>
@@ -126,7 +108,6 @@
 
     <!-- JavaScript -->
     <script>
-        // Yapılandırma değerleri
         const CONFIG = {
             centerLat: {{ kocaeli_center_lat }},
             centerLng: {{ kocaeli_center_lng }},
@@ -134,5 +115,7 @@
         };
     </script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <!-- Google Maps API — initMap callback çağrılır -->
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap" async defer></script>
 </body>
 </html>

@@ -456,91 +456,18 @@ body {
     z-index: 1;
 }
 
-/* Leaflet pin ikon — divIcon gölge kaldır */
-.leaflet-pin-icon {
-    background: none !important;
-    border: none !important;
+/* Google Maps InfoWindow özelleştirmesi */
+.gm-style .gm-style-iw-c {
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18) !important;
+    padding: 0 !important;
 }
-
-/* Leaflet popup özelleştirmesi */
-.haber-popup .leaflet-popup-content-wrapper {
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-    padding: 0;
-    font-family: 'Inter', sans-serif;
+.gm-style .gm-style-iw-d {
+    overflow: auto !important;
+    max-height: 380px !important;
 }
-.haber-popup .leaflet-popup-content {
-    margin: 0;
-    min-width: 240px;
-}
-.haber-popup .leaflet-popup-tip {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-}
-
-.popup-content {
-    padding: 16px;
-}
-
-.popup-title {
-    font-size: 0.92rem;
-    font-weight: 600;
-    color: var(--gray-800);
-    margin-bottom: 10px;
-    line-height: 1.4;
-}
-
-.popup-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    margin-bottom: 10px;
-    font-size: 0.78rem;
-    color: var(--gray-600);
-}
-
-.popup-meta span {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.popup-tag {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 6px;
-    color: white;
-    font-size: 0.72rem;
-    font-weight: 600;
-    width: fit-content;
-}
-
-.popup-excerpt {
-    font-size: 0.8rem;
-    color: var(--gray-600);
-    line-height: 1.5;
-    margin-bottom: 12px;
-    max-height: 80px;
-    overflow: hidden;
-}
-
-.popup-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: var(--primary);
-    color: white;
-    padding: 8px 16px;
-    border-radius: var(--radius);
-    text-decoration: none;
-    font-size: 0.8rem;
-    font-weight: 600;
-    transition: var(--transition);
-    width: 100%;
-    justify-content: center;
-}
-
-.popup-link:hover {
-    background: var(--primary-hover);
+.gm-style .gm-style-iw-tc::after {
+    background: white !important;
 }
 
 /* ---------- YÜKLENİYOR ---------- */
