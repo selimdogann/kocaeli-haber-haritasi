@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 def create_app():
-    """Flask uygulama fabrikası."""
+    """
+    Flask uygulama fabrikası (Factory Pattern).
+    Modüler yapıda: Blueprint ile API rotaları, Jinja2 ile template rendering.
+    """
     app = Flask(__name__)
 
     # CORS yapılandırması

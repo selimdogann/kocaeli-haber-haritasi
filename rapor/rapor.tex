@@ -1,0 +1,399 @@
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[turkish]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{url}
+\usepackage{cite}
+
+% Kod renklendirme ayarları
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.97,0.97,0.97}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\scriptsize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single
+}
+\lstset{style=mystyle}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\begin{document}
+
+\title{Kocaeli Haber Haritası: Yerel Haber Kaynaklarından\\Otomatik Veri Toplama ve Harita Üzerinde Görselleştirme}
+
+\author{
+    \IEEEauthorblockN{Selim Doğan}
+    \IEEEauthorblockA{
+        Kocaeli Üniversitesi\\
+        Bilgisayar Mühendisliği Bölümü\\
+        Kocaeli, Türkiye\\
+        selim.dogan@kocaeli.edu.tr
+    }
+}
+
+\maketitle
+
+\begin{abstract}
+Bu çalışmada, Kocaeli iline ait yerel haber kaynaklarından otomatik olarak haber toplayan, toplanan haberleri doğal dil işleme teknikleriyle sınıflandıran, metin benzerliği analizi ile mükerrer haberleri tespit eden ve sonuçları Google Maps üzerinde interaktif olarak görselleştiren bir web uygulaması geliştirilmiştir. Sistem; Flask web çerçevesi, MongoDB veritabanı, Google Maps ve Geocoding API'leri ile sentence-transformers kütüphanesini kullanmaktadır. Beş farklı yerel haber kaynağından web kazıma (scraping) ile toplanan haberler; veri temizleme, anahtar kelime tabanlı sınıflandırma, konum çıkarımı ve koordinat dönüştürme (geocoding) aşamalarından geçirilerek harita üzerinde kategori bazlı olarak gösterilmektedir. Kullanıcılar haber türü, ilçe ve tarih aralığına göre dinamik filtreleme yapabilmektedir.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Web kazıma, haber sınıflandırma, doğal dil işleme, metin benzerliği, geocoding, Google Maps, MongoDB, Flask
+\end{IEEEkeywords}
+
+% ==========================================
+\section{Giriş}
+% ==========================================
+
+Günümüzde yerel haber kaynakları, kent yaşamına dair önemli bilgiler sunmaktadır. Trafik kazaları, yangınlar, elektrik kesintileri, hırsızlık olayları ve kültürel etkinlikler gibi haberler, vatandaşların günlük hayatını doğrudan etkilemektedir. Ancak bu haberler farklı kaynaklarda dağınık biçimde yayınlanmakta, okuyucuların konumsal ilişkileri kavraması güçleşmektedir.
+
+Bu proje kapsamında, Kocaeli iline ait beş farklı yerel haber kaynağından otomatik olarak haber toplayan, bu haberleri sınıflandıran ve Google Maps üzerinde interaktif olarak görselleştiren bir web uygulaması geliştirilmiştir. Sistem, haberlerin coğrafi dağılımını görsel olarak sunarak kullanıcılara bütüncül bir bakış açısı sağlamaktadır.
+
+Projenin temel hedefleri şu şekilde özetlenebilir:
+\begin{itemize}
+    \item Beş farklı yerel haber kaynağından otomatik ve periyodik veri toplama
+    \item Haberlerin beş kategoriye (trafik kazası, yangın, elektrik kesintisi, hırsızlık, kültürel etkinlik) otomatik sınıflandırılması
+    \item Embedding tabanlı metin benzerliği analizi ile mükerrer haber tespiti
+    \item Haber metinlerinden konum bilgisi çıkarımı ve geocoding ile koordinat dönüşümü
+    \item Google Maps üzerinde kategori bazlı, filtrelenebilir interaktif görselleştirme
+\end{itemize}
+
+% ==========================================
+\section{Sistem Mimarisi ve Teknolojiler}
+% ==========================================
+
+\subsection{Genel Mimari}
+
+Sistem, modüler bir yapıda tasarlanmış olup Şekil~\ref{fig:mimari}'de gösterilen katmanlı mimariye sahiptir. Uygulama; veri toplama, veri işleme, veritabanı yönetimi ve sunum katmanlarından oluşmaktadır.
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox{0.42\textwidth}{\centering
+        \textbf{Sunum Katmanı}\\
+        HTML/CSS/JS + Google Maps API\\[4pt]
+        $\downarrow$ \quad $\uparrow$\\[4pt]
+        \textbf{API Katmanı}\\
+        Flask REST API\\[4pt]
+        $\downarrow$ \quad $\uparrow$\\[4pt]
+        \textbf{İşleme Katmanı}\\
+        Temizleme $\rightarrow$ Sınıflandırma $\rightarrow$ Konum $\rightarrow$ Geocoding\\[4pt]
+        $\downarrow$ \quad $\uparrow$\\[4pt]
+        \textbf{Veri Toplama Katmanı}\\
+        5 Haber Kaynağı Scraper\\[4pt]
+        $\downarrow$ \quad $\uparrow$\\[4pt]
+        \textbf{Veri Katmanı}\\
+        MongoDB (haberler + konumlar)
+    }}
+    \caption{Sistem mimarisi katmanları}
+    \label{fig:mimari}
+\end{figure}
+
+\subsection{Kullanılan Teknolojiler}
+
+Projede kullanılan başlıca teknolojiler Tablo~\ref{tab:teknolojiler}'de listelenmiştir.
+
+\begin{table}[H]
+    \centering
+    \caption{Kullanılan teknolojiler ve amaçları}
+    \label{tab:teknolojiler}
+    \begin{tabular}{|l|l|}
+        \hline
+        \textbf{Teknoloji} & \textbf{Kullanım Amacı} \\
+        \hline
+        Python 3.x & Ana programlama dili \\
+        Flask & Web çerçevesi ve REST API \\
+        MongoDB & NoSQL veritabanı \\
+        Google Maps JS API & Harita görselleştirme \\
+        Google Geocoding API & Koordinat dönüştürme \\
+        BeautifulSoup4 & HTML ayrıştırma \\
+        Requests & HTTP istekleri \\
+        sentence-transformers & Metin benzerliği analizi \\
+        scikit-learn & Kosinüs benzerliği hesaplama \\
+        ThreadPoolExecutor & Paralel scraping \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Proje Dosya Yapısı}
+
+Proje aşağıdaki modüler klasör yapısında organize edilmiştir:
+
+\begin{lstlisting}[language=bash, caption=Proje dosya yapısı]
+kocaeli-haber-harita/
+  app.py                  # Ana uygulama
+  config/settings.py      # Yapilandirma
+  scraper/                # 5 haber kaynagi scraper
+    scraper_manager.py    # Scraper koordinatoru
+    cagdas_kocaeli.py
+    ozgur_kocaeli.py
+    ses_kocaeli.py
+    yeni_kocaeli.py
+    bizim_yaka.py
+  processing/             # Veri isleme modulleri
+    cleaner.py            # Metin temizleme
+    classifier.py         # Haber siniflandirma
+    location_extractor.py # Konum cikarimi
+    similarity.py         # Benzerlik analizi
+  geocoding/geocoder.py   # Koordinat donusturme
+  database/mongodb.py     # MongoDB islemleri
+  api/routes.py           # REST API endpointleri
+  templates/index.html    # Ana sayfa sablonu
+  static/js/app.js        # Frontend JavaScript
+  static/css/style.css    # Stil dosyasi
+\end{lstlisting}
+
+% ==========================================
+\section{Veri Toplama (Web Scraping)}
+% ==========================================
+
+\subsection{Haber Kaynakları}
+
+Sistem, Kocaeli iline ait beş farklı yerel haber kaynağından veri toplamaktadır:
+
+\begin{enumerate}
+    \item \textbf{Çağdaş Kocaeli} (\url{cagdaskocaeli.com.tr})
+    \item \textbf{Özgür Kocaeli} (\url{ozgurkocaeli.com.tr})
+    \item \textbf{Ses Kocaeli} (\url{seskocaeli.com})
+    \item \textbf{Yeni Kocaeli} (\url{yenikocaeli.com})
+    \item \textbf{Bizim Yaka} (\url{bizimyaka.com})
+\end{enumerate}
+
+Her kaynak için ayrı bir scraper sınıfı geliştirilmiştir. Scraper'lar, BeautifulSoup kütüphanesi ile HTML sayfalarını ayrıştırarak başlık, içerik, yayın tarihi, kaynak bilgisi ve haber linkini çıkarmaktadır.
+
+\subsection{Paralel Scraping ve Performans}
+
+\texttt{ScraperManager} sınıfı, tüm scraper'ları koordine eder. Python'un \texttt{concurrent.futures.ThreadPoolExecutor} modülü kullanılarak paralel haber çekimi yapılmaktadır. Bu yaklaşım sayesinde scraping süresi yaklaşık 648 saniyeden 52 saniyeye düşürülmüştür (yaklaşık \%92 iyileşme).
+
+\subsection{Mükerrer Haber Kontrolü}
+
+Sistem iki seviyeli mükerrer kontrol uygulamaktadır:
+
+\begin{enumerate}
+    \item \textbf{Link bazlı kontrol:} MongoDB'de \texttt{haber\_linki} alanına \texttt{unique index} tanımlanmıştır. Aynı link tekrar eklenemez.
+    \item \textbf{Embedding bazlı benzerlik kontrolü:} Farklı kaynaklardan gelen aynı haberin farklı linklere sahip olabileceği durumlar için \texttt{sentence-transformers} modeli kullanılarak metin benzerliği analizi yapılır. Eşik değer $\theta = 0.90$ olarak belirlenmiştir.
+\end{enumerate}
+
+Benzerlik ölçümü kosinüs benzerliğine dayanmaktadır:
+
+\begin{equation}
+    \text{sim}(\vec{a}, \vec{b}) = \frac{\vec{a} \cdot \vec{b}}{||\vec{a}|| \cdot ||\vec{b}||}
+\end{equation}
+
+Benzerlik oranı $\geq 0.90$ olan haberler aynı haber kabul edilir ve \texttt{diger\_kaynaklar} dizisine eklenir. Bu sayede aynı haberin birden fazla kaynakta yayınlandığı bilgisi korunur.
+
+% ==========================================
+\section{Veri İşleme}
+% ==========================================
+
+\subsection{Metin Temizleme}
+
+\texttt{TextCleaner} sınıfı, ham HTML içerikten analiz edilebilir metin elde etmek için beş aşamalı bir temizleme boru hattı (pipeline) uygular:
+
+\begin{enumerate}
+    \item \textbf{HTML etiket temizliği:} \texttt{BeautifulSoup} ile \texttt{script}, \texttt{style}, \texttt{nav}, \texttt{footer} gibi etiketler kaldırılır.
+    \item \textbf{Metin normalizasyonu:} Unicode NFC normalizasyonu, tırnak ve tire standardizasyonu yapılır.
+    \item \textbf{Reklam temizliği:} 24 farklı regex kalıbı ile reklam, çerez politikası, sosyal medya paylaşım metinleri gibi alakasız içerikler tespit edilip kaldırılır.
+    \item \textbf{Özel karakter temizliği:} Türkçe karakterler korunarak gereksiz semboller kaldırılır.
+    \item \textbf{Boşluk temizliği:} Çoklu boşluklar teke indirilir, noktalama düzeltilir.
+\end{enumerate}
+
+\subsection{Haber Sınıflandırma}
+
+\texttt{NewsClassifier} sınıfı, anahtar kelime tabanlı bir sınıflandırma algoritması kullanmaktadır. Beş ana kategori tanımlanmıştır:
+
+\begin{table}[H]
+    \centering
+    \caption{Haber türleri ve öncelik sırası}
+    \label{tab:haber_turleri}
+    \begin{tabular}{|c|l|c|}
+        \hline
+        \textbf{Öncelik} & \textbf{Haber Türü} & \textbf{Anahtar Kelime Sayısı} \\
+        \hline
+        1 & Yangın & 22 \\
+        2 & Trafik Kazası & 28 \\
+        3 & Hırsızlık & 28 \\
+        4 & Elektrik Kesintisi & 21 \\
+        5 & Kültürel Etkinlikler & 34 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Skor hesaplama mekanizması şu şekilde çalışmaktadır:
+\begin{itemize}
+    \item Normal anahtar kelime eşleşmesi: $+1$ puan
+    \item Güçlü anahtar kelime eşleşmesi: $+3$ puan
+    \item Başlıkta normal eşleşme: $\times 2$ çarpan
+    \item Başlıkta güçlü eşleşme: $\times 5$ çarpan
+\end{itemize}
+
+Eşit skor durumunda düşük öncelik numaralı kategori seçilir (Yangın~$>$~Trafik~$>$~Hırsızlık~$>$~Elektrik~$>$~Kültürel). Hiçbir kategoriye girmeyen haberler ``Diğer'' olarak etiketlenir.
+
+\subsection{Konum Bilgisi Çıkarımı}
+
+\texttt{LocationExtractor} sınıfı, haber metninden olayın gerçekleştiği yer bilgisini çıkarır. Sekiz farklı regex kalıbı ile ilçe, mahalle, cadde/sokak, yol ve semt bilgileri tespit edilir. Ayrıca GOSB, Seka Park, Osmangazi Köprüsü gibi bilinen yerel landmark'lar da tanınmaktadır.
+
+Konum bilgisi, en spesifikten en genel düzeye doğru hiyerarşik olarak birleştirilir:
+
+\begin{equation*}
+    \text{sorgu} = \text{cadde} + \text{mahalle} + \text{ilçe} + \text{``Kocaeli''}
+\end{equation*}
+
+% ==========================================
+\section{Geocoding ve Harita Entegrasyonu}
+% ==========================================
+
+\subsection{Koordinat Dönüştürme}
+
+\texttt{Geocoder} sınıfı, metin tabanlı konum bilgisini enlem/boylam koordinatlarına dönüştürmek için Google Geocoding API'yi kullanır. Üç katmanlı bir strateji uygulanmaktadır:
+
+\begin{enumerate}
+    \item \textbf{Cache kontrolü:} MongoDB'deki \texttt{konumlar} koleksiyonunda daha önce geocoding yapılmış konumlar aranır. Bulunursa API çağrısı yapılmaz.
+    \item \textbf{Yerel fallback:} API kullanılamadığında, 12 ilçe merkez koordinatı üzerinden küçük rastgele sapma ($\pm 0.008$) eklenerek yaklaşık konum üretilir.
+    \item \textbf{API çağrısı:} Google Geocoding API'ye konum sorgusu gönderilir. Sonuç Kocaeli sınırları ($40.45° \leq \text{enlem} \leq 41.10°$, $29.20° \leq \text{boylam} \leq 30.30°$) içinde kontrol edilir.
+\end{enumerate}
+
+API anahtarları \texttt{.env} dosyasında saklanmakta, kaynak kodda yer almamakta ve \texttt{.gitignore} ile versiyon kontrolünden hariç tutulmaktadır.
+
+\subsection{Google Maps Entegrasyonu}
+
+Frontend tarafında Google Maps JavaScript API kullanılarak interaktif bir harita oluşturulmuştur. Harita özellikleri:
+
+\begin{itemize}
+    \item Kocaeli merkez koordinatları ($40.7654°N$, $29.9408°E$) ve zoom seviyesi 11 ile başlatılır.
+    \item Her haber türü için farklı renk ve sembolde SVG marker ikonları kullanılır.
+    \item Marker'a tıklandığında InfoWindow açılır: başlık, tarih, kaynak, konum ve ``Habere Git'' bağlantısı görüntülenir.
+    \item ``Habere Git'' bağlantısı haberin orijinal kaynağını yeni sekmede açar.
+\end{itemize}
+
+% ==========================================
+\section{Kullanıcı Arayüzü}
+% ==========================================
+
+Web arayüzü tek sayfalık uygulama (SPA) mimarisinde tasarlanmıştır. Sol panelde filtreler ve haber listesi, ana alanda ise Google Maps haritası yer almaktadır.
+
+\subsection{Filtreleme Sistemi}
+
+Kullanıcılar üç farklı filtreleme kriteri uygulayabilir:
+
+\begin{enumerate}
+    \item \textbf{Haber türü filtresi:} Checkbox'lar ile bir veya birden fazla haber türü seçilebilir.
+    \item \textbf{İlçe filtresi:} Dropdown menüsünden 12 Kocaeli ilçesi arasından seçim yapılabilir.
+    \item \textbf{Tarih aralığı filtresi:} Başlangıç ve bitiş tarihi ile aralık belirlenir.
+\end{enumerate}
+
+Tüm filtre değişiklikleri AJAX ile sayfa yenilenmeden gerçekleştirilir. Her filtre değişikliğinde harita marker'ları ve haber listesi dinamik olarak güncellenir.
+
+\subsection{Haber Listesi}
+
+Sol paneldeki haber listesinde her haber kartı; başlık, tür etiketi, tarih ve kaynak bilgisini içerir. Bir haber kartına tıklandığında harita ilgili konuma yakınlaştırılır ve marker'ın InfoWindow'u otomatik olarak açılır.
+
+\subsection{İstatistikler}
+
+Arayüzde toplam haber sayısı, haritada gösterilen haber sayısı ve her haber türünün dağılımı çubuk grafikleri ile gösterilmektedir.
+
+% ==========================================
+\section{Sonuçlar ve Değerlendirme}
+% ==========================================
+
+Geliştirilen sistem başarıyla çalışmaktadır. Yapılan testlerde elde edilen sonuçlar Tablo~\ref{tab:sonuclar}'de özetlenmiştir.
+
+\begin{table}[H]
+    \centering
+    \caption{Sistem test sonuçları}
+    \label{tab:sonuclar}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Metrik} & \textbf{Değer} \\
+        \hline
+        Toplam toplanan haber & 362 \\
+        Haritada gösterilen (konumlu) & 184 \\
+        Çoklu kaynaklı haber & 20 \\
+        Tekrar eden link sayısı & 0 \\
+        Scraping süresi (5 kaynak) & $\sim$52 sn \\
+        Benzerlik eşik değeri & 0.90 \\
+        Desteklenen haber türü & 6 \\
+        Desteklenen ilçe & 12 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{Karşılaşılan Zorluklar}
+
+\begin{itemize}
+    \item Her haber kaynağının farklı HTML yapısına sahip olması, her biri için özel scraper yazılmasını gerektirmiştir.
+    \item Bazı haber metinlerinde yeterli konum bilgisi bulunmaması, geocoding başarı oranını düşürmüştür.
+    \item Google Maps JavaScript API'nin faturalandırma gerektirmesi, geliştirme sürecinde ek yapılandırma zorunluluğu doğurmuştur.
+\end{itemize}
+
+\subsection{Gelecek Çalışmalar}
+
+\begin{itemize}
+    \item Derin öğrenme tabanlı haber sınıflandırma (BERT/GPT modelleri)
+    \item Gerçek zamanlı haber takibi (RSS/WebSocket)
+    \item Mobil uyumlu arayüz geliştirme
+    \item Haber duygu analizi (sentiment analysis)
+    \item Zaman serisi analizi ile trend tespiti
+\end{itemize}
+
+% ==========================================
+\section{Sonuç}
+% ==========================================
+
+Bu projede, Kocaeli iline ait yerel haber kaynaklarından otomatik veri toplama, doğal dil işleme teknikleriyle sınıflandırma ve Google Maps üzerinde interaktif görselleştirme yapan kapsamlı bir web uygulaması geliştirilmiştir. Sistem; web kazıma, metin temizleme, anahtar kelime tabanlı sınıflandırma, embedding tabanlı benzerlik analizi, konum çıkarımı, geocoding ve harita görselleştirme gibi birçok aşamayı entegre etmektedir.
+
+Modüler mimari sayesinde yeni haber kaynakları ve kategoriler kolayca eklenebilmektedir. MongoDB'nin esnek yapısı farklı veri formatlarını desteklerken, Google Maps API zengin görselleştirme imkânları sunmaktadır. Paralel scraping ile elde edilen performans iyileştirmesi ve cache mekanizması ile gereksiz API çağrılarının önlenmesi, sistemin verimli çalışmasını sağlamaktadır.
+
+\begin{thebibliography}{00}
+
+\bibitem{flask} Pallets Projects, ``Flask: A Python Micro-framework,'' \url{https://flask.palletsprojects.com/}, 2024.
+
+\bibitem{mongodb} MongoDB Inc., ``MongoDB Documentation,'' \url{https://docs.mongodb.com/}, 2024.
+
+\bibitem{googlemaps} Google Developers, ``Maps JavaScript API,'' \url{https://developers.google.com/maps/documentation/javascript}, 2024.
+
+\bibitem{geocoding} Google Developers, ``Geocoding API,'' \url{https://developers.google.com/maps/documentation/geocoding}, 2024.
+
+\bibitem{beautifulsoup} L. Richardson, ``Beautiful Soup Documentation,'' \url{https://www.crummy.com/software/BeautifulSoup/}, 2024.
+
+\bibitem{sbert} N. Reimers and I. Gurevych, ``Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks,'' in \textit{Proceedings of EMNLP-IJCNLP}, 2019, pp. 3982–3992.
+
+\bibitem{cosine} A. Huang, ``Similarity Measures for Text Document Clustering,'' in \textit{Proc. New Zealand Computer Science Research Student Conference}, 2008, pp. 49–56.
+
+\bibitem{webscraping} R. Mitchell, \textit{Web Scraping with Python: Collecting More Data from the Modern Web}, 2nd ed. O'Reilly Media, 2018.
+
+\end{thebibliography}
+
+\end{document}

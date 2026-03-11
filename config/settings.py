@@ -63,37 +63,37 @@ class Config:
     NEWS_TYPES = {
         "trafik_kazasi": {
             "label": "Trafik Kazası",
-            "color": "#FF0000",
+            "color": "#DC2626",
             "icon": "🚗",
             "marker_color": "red",
         },
         "yangin": {
             "label": "Yangın",
-            "color": "#FF8C00",
+            "color": "#EA580C",
             "icon": "🔥",
             "marker_color": "orange",
         },
         "elektrik_kesintisi": {
             "label": "Elektrik Kesintisi",
-            "color": "#FFD700",
+            "color": "#1e293b",
             "icon": "⚡",
             "marker_color": "yellow",
         },
         "hirsizlik": {
             "label": "Hırsızlık",
-            "color": "#800080",
+            "color": "#7C3AED",
             "icon": "🔒",
             "marker_color": "purple",
         },
         "kulturel_etkinlik": {
             "label": "Kültürel Etkinlikler",
-            "color": "#0000FF",
+            "color": "#2563EB",
             "icon": "🎭",
             "marker_color": "blue",
         },
         "diger": {
             "label": "Diğer",
-            "color": "#808080",
+            "color": "#6B7280",
             "icon": "📰",
             "marker_color": "gray",
         },
