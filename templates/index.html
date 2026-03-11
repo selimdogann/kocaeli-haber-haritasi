@@ -84,7 +84,7 @@
                 <div id="tur-dagilimi" class="tur-dagilimi"></div>
             </div>
 
-            <div class="filter-group haber-listesi-group">
+            <div class="haber-listesi-group">
                 <label class="filter-label">📰 Haberler</label>
                 <div id="haber-listesi" class="haber-listesi">
                     <p class="loading-text">Haberler yükleniyor...</p>
@@ -95,6 +95,18 @@
         <!-- HARİTA -->
         <div class="map-container">
             <div id="map" class="map"></div>
+
+            <!-- Harita Lejandı (sağ altta) -->
+            <div class="map-legend" id="map-legend">
+                <div class="legend-title">📌 Haber Türleri</div>
+                {% for tur_id, tur_bilgi in news_types.items() %}
+                <div class="legend-item">
+                    <span class="legend-color" style="background-color: {{ tur_bilgi.color }}"></span>
+                    <span class="legend-label">{{ tur_bilgi.icon }} {{ tur_bilgi.label }}</span>
+                </div>
+                {% endfor %}
+            </div>
+
             <div id="loading-overlay" class="loading-overlay" style="display: none;">
                 <div class="spinner"></div>
                 <p>İşlem devam ediyor...</p>

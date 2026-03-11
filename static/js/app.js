@@ -10,10 +10,12 @@ let infoWindow;
 let haberler = [];
 
 // ==================== HARİTA BAŞLATMA ====================
+// Google Maps API yüklendiğinde callback olarak çağrılır.
+// Harita Kocaeli merkez koordinatlarında (40.7654, 29.9408) başlatılır.
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
         center: { lat: CONFIG.centerLat, lng: CONFIG.centerLng },
-        zoom: 11,
+        zoom: 11, // Kocaeli ili genelini gösterecek yakınlaştırma seviyesi
         mapTypeControl: true,
         mapTypeControlOptions: {
             style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
@@ -37,17 +39,23 @@ function initMap() {
 }
 
 // ==================== SVG PIN İKON OLUŞTURUCU ====================
+// Beyaz pin + renkli yuvarlak kare badge stili (referans görsele uygun)
 
 function pinSvgOlustur(renk, ikonSvg) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
+    // id collision'u önlemek için renk hash'i
+    const hid = renk.replace('#','');
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
         <defs>
-            <filter id="s" x="-20%" y="-10%" width="140%" height="130%">
-                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
+            <filter id="ds${hid}" x="-30%" y="-10%" width="160%" height="140%">
+                <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
             </filter>
         </defs>
-        <path d="M18 47C18 47 34 28 34 16.5C34 7.9 26.8 1 18 1C9.2 1 2 7.9 2 16.5C2 28 18 47 18 47Z"
-              fill="${renk}" stroke="#fff" stroke-width="2" filter="url(#s)"/>
-        <circle cx="18" cy="16" r="11" fill="rgba(255,255,255,0.25)"/>
+        <!-- Beyaz pin gövdesi -->
+        <path d="M20 50C20 50 37 30 37 17.5C37 8.4 29.4 1 20 1C10.6 1 3 8.4 3 17.5C3 30 20 50 20 50Z"
+              fill="#fff" stroke="#d1d5db" stroke-width="1" filter="url(#ds${hid})"/>
+        <!-- Renkli yuvarlak kare badge -->
+        <rect x="8" y="6" width="24" height="24" rx="7" fill="${renk}"/>
+        <!-- İkon -->
         ${ikonSvg}
     </svg>`;
 }
@@ -58,45 +66,58 @@ function markerIkonlariniHazirla() {
     if (MARKER_ICONS) return;
 
     const ikonlar = {
-        trafik_kazasi: pinSvgOlustur('#E53E3E',
-            `<g fill="#fff" transform="translate(18,16)">
-                <path d="M-8,0.5 L-6,-4.5 L6,-4.5 L8,0.5 L8,3 L-8,3 Z"/>
-                <rect x="-5.5" y="-4" width="4" height="3" rx="0.5" fill="#E53E3E" opacity="0.5"/>
-                <rect x="1.5" y="-4" width="4" height="3" rx="0.5" fill="#E53E3E" opacity="0.5"/>
-                <circle cx="-5" cy="4.5" r="1.8" fill="#fff"/>
-                <circle cx="5" cy="4.5" r="1.8" fill="#fff"/>
+        // Trafik Kazası — kırmızı badge, beyaz araba
+        trafik_kazasi: pinSvgOlustur('#DC2626',
+            `<g fill="#fff" transform="translate(20,18)">
+                <path d="M-7,0 L-5.5,-4 L5.5,-4 L7,0 Z" stroke="#fff" stroke-width="0.5"/>
+                <rect x="-7" y="0" width="14" height="3.5" rx="1"/>
+                <circle cx="-4.5" cy="5" r="2" fill="#fff"/>
+                <circle cx="4.5" cy="5" r="2" fill="#fff"/>
+                <circle cx="-4.5" cy="5" r="1" fill="#DC2626"/>
+                <circle cx="4.5" cy="5" r="1" fill="#DC2626"/>
+                <rect x="-4" y="-3.5" width="3.2" height="2.5" rx="0.8" fill="#DC2626" opacity="0.4"/>
+                <rect x="0.8" y="-3.5" width="3.2" height="2.5" rx="0.8" fill="#DC2626" opacity="0.4"/>
             </g>`),
 
-        yangin: pinSvgOlustur('#ED8936',
-            `<path d="M18,7 C18,7 12.5,12.5 12.5,16.5 C12.5,19.5 14.9,22 18,22
-                     C21.1,22 23.5,19.5 23.5,16.5 C23.5,12.5 18,7 18,7 Z" fill="#fff"/>
-             <path d="M18,13 C18,13 15.8,15.2 15.8,16.8 C15.8,18 16.8,19 18,19
-                     C19.2,19 20.2,18 20.2,16.8 C20.2,15.2 18,13 18,13 Z" fill="#ED8936"/>`),
-
-        hirsizlik: pinSvgOlustur('#805AD5',
-            `<g fill="#fff" transform="translate(18,16)">
-                <path d="M0,-9 L8,-5 L8,1 C8,5.5 4.5,8.5 0,10 C-4.5,8.5 -8,5.5 -8,1 L-8,-5 Z"/>
-                <path d="M0,-5 L4.5,-2.5 L4.5,0.8 C4.5,3.8 2.5,5.5 0,6.5 C-2.5,5.5 -4.5,3.8 -4.5,0.8 L-4.5,-2.5 Z"
-                      fill="#805AD5" opacity="0.4"/>
+        // Yangın — turuncu badge, beyaz alev
+        yangin: pinSvgOlustur('#EA580C',
+            `<g fill="#fff" transform="translate(20,18)">
+                <path d="M0,-8 C0,-8 -6,-2 -6,2.5 C-6,5.8 -3.3,8.5 0,8.5 C3.3,8.5 6,5.8 6,2.5 C6,-2 0,-8 0,-8Z"/>
+                <path d="M0,-3 C0,-3 -2.8,0 -2.8,2 C-2.8,3.5 -1.5,4.8 0,4.8 C1.5,4.8 2.8,3.5 2.8,2 C2.8,0 0,-3 0,-3Z" fill="#EA580C" opacity="0.5"/>
             </g>`),
 
-        elektrik_kesintisi: pinSvgOlustur('#D69E2E',
-            `<polygon points="20,6.5 14.5,15.5 17.5,15.5 14.5,25 22,14 18.5,14 21,6.5" fill="#fff"/>`),
-
-        kulturel_etkinlik: pinSvgOlustur('#3182CE',
-            `<g fill="#fff" transform="translate(18,16)">
-                <ellipse cx="-3.5" cy="5" rx="3.5" ry="2.5"/>
-                <rect x="-0.3" y="-8" width="2" height="13"/>
-                <path d="M1.7,-8 L8,-10 L8,-4.5 L1.7,-2.5 Z"/>
+        // Hırsızlık — mor badge, beyaz gözlük/maske ikonu
+        hirsizlik: pinSvgOlustur('#7C3AED',
+            `<g fill="#fff" transform="translate(20,18)">
+                <ellipse cx="-3.8" cy="-1" rx="3.2" ry="2.5" fill="none" stroke="#fff" stroke-width="2"/>
+                <ellipse cx="3.8" cy="-1" rx="3.2" ry="2.5" fill="none" stroke="#fff" stroke-width="2"/>
+                <path d="M-0.6,-1 L0.6,-1" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+                <line x1="-7" y1="-1" x2="-7" y2="-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+                <line x1="7" y1="-1" x2="7" y2="-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M-5,4 C-5,4 -2.5,7 0,7 C2.5,7 5,4 5,4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
             </g>`),
 
-        diger: pinSvgOlustur('#718096',
-            `<g fill="#fff" transform="translate(18,16)">
-                <rect x="-6.5" y="-8" width="13" height="16" rx="2"/>
-                <line x1="-4" y1="-4.5" x2="4" y2="-4.5" stroke="#718096" stroke-width="1.3"/>
-                <line x1="-4" y1="-1.5" x2="4" y2="-1.5" stroke="#718096" stroke-width="1.3"/>
-                <line x1="-4" y1="1.5" x2="2" y2="1.5" stroke="#718096" stroke-width="1.3"/>
-                <line x1="-4" y1="4.5" x2="3" y2="4.5" stroke="#718096" stroke-width="1.3"/>
+        // Elektrik Kesintisi — koyu badge, sarı şimşek
+        elektrik_kesintisi: pinSvgOlustur('#1e293b',
+            `<polygon points="22,8 16,17.5 19,17.5 16,26 24,15.5 20.5,15.5 22.5,8" fill="#FACC15"/>`),
+
+        // Kültürel Etkinlik — mavi badge, beyaz müzik notu
+        kulturel_etkinlik: pinSvgOlustur('#2563EB',
+            `<g fill="#fff" transform="translate(20,18)">
+                <circle cx="-3.5" cy="5" r="3"/>
+                <circle cx="4" cy="3.5" r="3"/>
+                <rect x="-0.8" y="-7" width="2.2" height="12.5"/>
+                <rect x="3.7" y="-7" width="2.2" height="10.5"/>
+                <path d="M1.4,-7 L5.9,-7 L5.9,-4 L1.4,-4Z" rx="1"/>
+            </g>`),
+
+        // Diğer — gri badge, beyaz belge
+        diger: pinSvgOlustur('#6B7280',
+            `<g fill="#fff" transform="translate(20,18)">
+                <rect x="-6" y="-7.5" width="12" height="15" rx="2"/>
+                <line x1="-3.5" y1="-4" x2="3.5" y2="-4" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="-3.5" y1="-0.8" x2="3.5" y2="-0.8" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="-3.5" y1="2.4" x2="1.5" y2="2.4" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round"/>
             </g>`),
     };
 
@@ -104,8 +125,8 @@ function markerIkonlariniHazirla() {
     for (const [tur, svg] of Object.entries(ikonlar)) {
         MARKER_ICONS[tur] = {
             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-            scaledSize: new google.maps.Size(36, 48),
-            anchor: new google.maps.Point(18, 48),
+            scaledSize: new google.maps.Size(40, 52),
+            anchor: new google.maps.Point(20, 52),
         };
     }
 }
@@ -234,6 +255,7 @@ function infoWindowAc(marker, haber) {
     const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
     const tarih = haber.tarih ? tarihFormatla(haber.tarih) : 'Tarih bilinmiyor';
     const kaynaklar = haber.kaynaklar ? haber.kaynaklar.map(k => k.kaynak_adi).join(', ') : (haber.kaynak_adi || '');
+    const kaynakSayisi = haber.kaynaklar ? haber.kaynaklar.length : 1;
     const icerikOzet = haber.icerik ? haber.icerik.substring(0, 150) + (haber.icerik.length > 150 ? '...' : '') : '';
 
     const konum = [];
@@ -246,21 +268,22 @@ function infoWindowAc(marker, haber) {
     const haberLinki = haber.haber_linki || (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].link : '#');
 
     const icerik = `
-        <div style="font-family:'Inter',sans-serif;max-width:320px;">
-            <div style="font-size:14px;font-weight:600;color:#1e293b;margin-bottom:8px;line-height:1.4;">
+        <div style="font-family:'Inter',sans-serif;max-width:330px;padding:4px;">
+            <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:10px;line-height:1.45;letter-spacing:-0.2px;">
                 ${escapeHtml(haber.baslik)}
             </div>
-            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-size:12px;color:#475569;">
-                <span style="display:inline-block;padding:3px 10px;border-radius:6px;color:#fff;font-size:11px;font-weight:600;background:${turBilgi.color};width:fit-content;">
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:12.5px;color:#475569;">
+                <span style="display:inline-block;padding:4px 12px;border-radius:8px;color:#fff;font-size:11.5px;font-weight:700;background:linear-gradient(135deg,${turBilgi.color},${turBilgi.color}dd);width:fit-content;letter-spacing:0.3px;box-shadow:0 2px 6px ${turBilgi.color}44;">
                     ${turBilgi.icon} ${turBilgi.label}
                 </span>
                 <span>📅 ${tarih}</span>
                 <span>📍 ${escapeHtml(konumMetni)}</span>
                 ${kaynaklar ? `<span>📰 ${escapeHtml(kaynaklar)}</span>` : ''}
+                ${kaynakSayisi > 1 ? `<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;">📡 ${kaynakSayisi} kaynakta</span>` : ''}
             </div>
-            ${icerikOzet ? `<div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:10px;">${escapeHtml(icerikOzet)}</div>` : ''}
+            ${icerikOzet ? `<div style="font-size:12.5px;color:#64748b;line-height:1.55;margin-bottom:12px;padding:8px 10px;background:#f8fafc;border-radius:8px;border-left:3px solid ${turBilgi.color};">${escapeHtml(icerikOzet)}</div>` : ''}
             <a href="${escapeHtml(haberLinki)}" target="_blank" rel="noopener"
-               style="display:block;text-align:center;background:#2563eb;color:#fff;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">
+               style="display:block;text-align:center;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-size:13.5px;font-weight:700;letter-spacing:0.3px;box-shadow:0 4px 12px rgba(99,102,241,0.3);transition:all 0.2s;">
                 Habere Git &rarr;
             </a>
         </div>
@@ -276,6 +299,9 @@ function markerlariTemizle() {
 }
 
 // ==================== FİLTRE İŞLEMLERİ ====================
+// Tüm filtrelemeler AJAX ile sayfa yenilenmeden (no-reload) yapılır.
+// Filtre değiştiğinde → filtreUygula() → haberleriGetir() → API çağrısı
+// → marker'lar ve haber listesi dinamik güncellenir
 
 function filtreParametreleriOlustur() {
     const params = {};
@@ -319,6 +345,10 @@ function haberListesiniGuncelle(haberListesi) {
         const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
         const tarih = haber.tarih ? tarihFormatla(haber.tarih) : '';
         const kaynak = haber.kaynak_adi || (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].kaynak_adi : '');
+        const kaynakSayisi = haber.kaynaklar ? haber.kaynaklar.length : 1;
+        const multiSourceBadge = kaynakSayisi > 1
+            ? `<span class="multi-source-badge">📡 ${kaynakSayisi} kaynak</span>`
+            : '';
         html += `
             <div class="haber-card" style="border-left-color: ${turBilgi.color}"
                  onclick="habereTikla(${index})" title="${escapeHtml(haber.baslik)}">
@@ -327,6 +357,7 @@ function haberListesiniGuncelle(haberListesi) {
                     <span class="haber-card-tag" style="background-color: ${turBilgi.color}">
                         ${turBilgi.icon} ${turBilgi.label}
                     </span>
+                    ${multiSourceBadge}
                     ${tarih ? `<span>📅 ${tarih}</span>` : ''}
                     ${kaynak ? `<span>📰 ${escapeHtml(kaynak)}</span>` : ''}
                 </div>

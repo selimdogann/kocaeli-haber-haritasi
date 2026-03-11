@@ -196,15 +196,24 @@ class ScraperManager:
 
     def _haber_isle_ve_kaydet(self, haber: dict) -> str:
         """
-        Tek bir haberi işler: temizler, sınıflandırır, konumlar ve kaydeder.
+        Tek bir haberi 7 adımlı işleme hattından (pipeline) geçirir:
+        1. Link bazlı mükerrer kontrol
+        2. Metin temizleme (HTML, boşluk, reklam, normalizasyon)
+        3. Embedding bazlı benzerlik kontrolü (eşik: 0.90)
+        4. Anahtar kelime tabanlı haber sınıflandırma
+        5. Regex ile konum bilgisi çıkarımı (ilçe, mahalle, cadde)
+        6. Google Geocoding API ile koordinat dönüştürme
+        7. MongoDB'ye kaydetme
 
         Args:
-            haber: Ham haber verisi
+            haber: Ham haber verisi (scraper'dan gelen dict)
 
         Returns:
             str: İşlem sonucu ('kaydedildi', 'tekrar', 'benzer', 'konumsuz', 'hata')
         """
-        # 1. Duplicate kontrolü (link bazlı)
+        # ADIM 1: Link bazlı mükerrer kontrol
+        # MongoDB'de haber_linki alanına unique index tanımlıdır.
+        # Aynı link zaten veritabanında varsa işlem yapılmaz.
         if haber.get("haber_linki") in self._mevcut_linkler_cache:
             return "tekrar"
 
@@ -219,11 +228,18 @@ class ScraperManager:
         if not haber.get("baslik"):
             return "hata"
 
-        # 3. Benzerlik kontrolü (embedding tabanlı)
+        # ADIM 3: Embedding tabanlı benzerlik kontrolü
+        # Farklı kaynaklardan gelen aynı haberin farklı linklere sahip
+        # olabileceği durumlar için sentence-transformers modeli kullanılır.
+        # Model: paraphrase-multilingual-MiniLM-L12-v2 (Türkçe destekli)
+        # Kosinüs benzerliği hesaplanır: sim(a,b) = (a·b) / (||a|| * ||b||)
+        # Eşik değeri: 0.90 (Config.SIMILARITY_THRESHOLD)
         yeni_metin = f"{haber['baslik']} {haber.get('icerik', '')}"
 
         if self.db and self._mevcut_haberler_cache:
+            # Yeni haberin embedding vektörünü oluştur (384 boyutlu)
             yeni_embedding = self.benzerlik_analizoru.embedding_olustur(yeni_metin)
+            # Mevcut tüm haberlerle kosinüs benzerliğini karşılaştır
             benzerler = self.benzerlik_analizoru.benzerleri_bul(
                 yeni_metin,
                 self._mevcut_haberler_cache,
@@ -232,7 +248,9 @@ class ScraperManager:
             )
 
             if benzerler:
-                # Aynı haber bulundu - kaynak bilgisini ekle
+                # Benzerlik >= 0.90 → Aynı haber kabul edilir.
+                # Ana haberin diger_kaynaklar dizisine yeni kaynak eklenir.
+                # Bu sayede çoklu kaynak bilgisi korunur.
                 en_benzer = benzerler[0]
                 self.db.haber_kaynak_ekle(
                     en_benzer["haber"]["haber_linki"],
@@ -245,7 +263,12 @@ class ScraperManager:
                 self._mevcut_linkler_cache.add(haber.get("haber_linki"))
                 return "benzer"
 
-        # 4. Haber sınıflandırma
+        # ADIM 4: Anahtar kelime tabanlı haber sınıflandırma
+        # Her habere yalnızca bir tür atanır. Skor hesaplama:
+        #   - Normal kelime eşleşmesi: +1 puan
+        #   - Güçlü kelime eşleşmesi: +3 puan
+        #   - Başlıkta eşleşme: x2 çarpan (güçlü ise x5)
+        # Öncelik sırası: Yangın > Trafik > Hırsızlık > Elektrik > Kültürel
         siniflandirma = self.siniflandirici.siniflandir(
             haber.get("baslik", ""),
             haber.get("icerik", ""),
@@ -253,12 +276,17 @@ class ScraperManager:
         haber["haber_turu"] = siniflandirma["haber_turu"]
         haber["siniflandirma_guven"] = siniflandirma["guven_skoru"]
 
-        # Sınıflandırılamayan haberleri "diger" olarak etiketle
+        # Sınıflandırılamayan haberler (hiçbir anahtar kelime eşleşmedi)
+        # "diger" kategorisine atanır
         if not haber["haber_turu"]:
             haber["haber_turu"] = "diger"
             haber["siniflandirma_guven"] = 0.0
 
-        # 5. Konum çıkarımı
+        # ADIM 5: Konum bilgisi çıkarımı (NLP / Regex)
+        # 8 farklı regex kalıbı ile ilçe, mahalle, cadde/sokak, yol,
+        # semt tespiti yapılır. Ayrıca GOSB, Seka Park gibi bilinen
+        # landmark'lar da tanınır.
+        # Sonuç: En spesifikten genele → cadde + mahalle + ilçe + Kocaeli
         konum_bilgisi = self.konum_cikarici.konum_cikar(
             haber.get("baslik", ""),
             haber.get("icerik", ""),
@@ -268,7 +296,9 @@ class ScraperManager:
         haber["mahalle"] = konum_bilgisi.get("mahalle")
         haber["tum_konumlar"] = konum_bilgisi.get("tum_konumlar", [])
 
-        # 6. Geocoding
+        # ADIM 6: Geocoding (konum metni → enlem/boylam koordinatları)
+        # Strateji: 1) Cache kontrol  2) Yerel ilçe fallback  3) Google API
+        # Sonuç Kocaeli sınırları içinde doğrulanır (40.45°-41.10° / 29.20°-30.30°)
         if konum_bilgisi.get("geocoding_sorgusu"):
             geo_sonuc = self.geocoder.koordinat_bul(
                 konum_bilgisi["geocoding_sorgusu"]
