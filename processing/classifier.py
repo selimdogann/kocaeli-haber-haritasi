@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 class NewsClassifier:
     """Anahtar kelime tabanlı haber sınıflandırıcı."""
 
+    TRAFIK_MIN_ESLESME = 2
+    MIN_GUVEN_ESIGI = 0.6
+
     # Haber türleri ve anahtar kelimeleri
     # Her kategorinin bir ağırlık/öncelik değeri vardır (düşük = yüksek öncelik)
     SINIFLANDIRMA_KURALLARI = {
@@ -43,17 +46,28 @@ class NewsClassifier:
         "trafik_kazasi": {
             "oncelik": 2,
             "anahtar_kelimeler": [
-                "kaza", "trafik kazası", "trafik", "çarpışma", "çarpıştı",
-                "takla attı", "takla", "devrildi", "savruldu", "kazada",
-                "kazası", "kaza yapan", "yaralı", "yaralandı", "ölümlü",
-                "can verdi", "hayatını kaybetti", "feci kaza", "zincirleme",
-                "otomobil", "araç", "motosiklet", "kamyon", "tır",
-                "minibüs", "otobüs", "sürücü", "yaya", "çarpma",
-                "kaza anı", "maddi hasar", "ambulans",
+                "trafik kazası",
+                "feci kaza",
+                "zincirleme",
+                "çarpışma",
+                "çarpıştı",
+                "takla attı",
+                "devrildi",
+                "yoldan çıktı",
+                "savruldu",
+                "otomobil",
+                "motosiklet",
+                "kamyon",
+                "tır",
+                "minibüs",
+                "otobüs",
+                "sürücü",
+                "araç",
+                "yaya çarpması",
             ],
             "guclu_anahtar_kelimeler": [
-                "trafik kazası", "kaza", "çarpışma", "takla attı",
-                "feci kaza", "zincirleme",
+                "trafik kazası", "çarpışma", "takla attı",
+                "feci kaza", "zincirleme", "yoldan çıktı",
             ],
         },
         "hirsizlik": {
@@ -104,6 +118,26 @@ class NewsClassifier:
                 "gösteri", "şenlik",
             ],
         },
+        "vefat": {
+            "oncelik": 6,
+            "anahtar_kelimeler": [
+                "vefat etti",
+                "hayatını kaybetti",
+                "yaşamını yitirdi",
+                "son yolculuğuna uğurlandı",
+                "hayata gözlerini yumdu",
+            ],
+            "guclu_anahtar_kelimeler": [
+                "vefat etti",
+                "hayatını kaybetti",
+                "yaşamını yitirdi",
+            ],
+        },
+        "diger": {
+            "oncelik": 999,
+            "anahtar_kelimeler": [],
+            "guclu_anahtar_kelimeler": [],
+        },
     }
 
     def __init__(self):
@@ -153,6 +187,7 @@ class NewsClassifier:
         baslik_lower = (baslik or "").lower()
 
         skorlar = {}
+        trafik_eslesme_sayisi = 0
 
         for tur, kaliplar in self.derli_kaliplar.items():
             skor = 0
@@ -164,6 +199,8 @@ class NewsClassifier:
 
                 skor += icerik_eslesmeler
                 skor += baslik_eslesmeler * 2  # Başlıkta bulunma bonus
+                if tur == "trafik_kazasi":
+                    trafik_eslesme_sayisi += icerik_eslesmeler + baslik_eslesmeler
 
             # Güçlü anahtar kelime eşleşmeleri
             for kalip in kaliplar["guclu"]:
@@ -172,8 +209,13 @@ class NewsClassifier:
 
                 skor += icerik_eslesmeler * 3
                 skor += baslik_eslesmeler * 5  # Başlıkta güçlü kelime büyük bonus
+                if tur == "trafik_kazasi":
+                    trafik_eslesme_sayisi += icerik_eslesmeler + baslik_eslesmeler
 
             skorlar[tur] = skor
+
+        if trafik_eslesme_sayisi < self.TRAFIK_MIN_ESLESME:
+            skorlar["trafik_kazasi"] = 0
 
         # En yüksek skorlu türü bul
         if not skorlar or max(skorlar.values()) == 0:
@@ -202,6 +244,9 @@ class NewsClassifier:
         toplam_skor = sum(skorlar.values())
         guven_skoru = skorlar[secilen_tur] / toplam_skor if toplam_skor > 0 else 0.0
 
+        if guven_skoru < self.MIN_GUVEN_ESIGI:
+            secilen_tur = "diger"
+
         return {
             "haber_turu": secilen_tur,
             "guven_skoru": round(guven_skoru, 4),
@@ -216,7 +261,7 @@ class NewsClassifier:
             haberler: [{baslik, icerik}, ...] formatında haber listesi
 
         Returns:
-            list: Her haberin sınıflandırma sonucu
+            list: Her haberin sınıflandırma sonucuu
         """
         sonuclar = []
         for haber in haberler:
