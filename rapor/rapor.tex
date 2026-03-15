@@ -78,14 +78,14 @@ Web kazıma, haber sınıflandırma, doğal dil işleme, metin benzerliği, geoc
 \section{Giriş}
 % ==========================================
 
-Günümüzde yerel haber kaynakları, kent yaşamına dair önemli bilgiler sunmaktadır. Trafik kazaları, yangınlar, elektrik kesintileri, hırsızlık olayları ve kültürel etkinlikler gibi haberler, vatandaşların günlük hayatını doğrudan etkilemektedir. Ancak bu haberler farklı kaynaklarda dağınık biçimde yayınlanmakta, okuyucuların konumsal ilişkileri kavraması güçleşmektedir.
+Günümüzde yerel haber kaynakları, kent yaşamına dair önemli bilgiler sunmaktadır. Trafik kazaları, yangınlar, elektrik kesintileri, hırsızlık olayları, vefat haberleri, sağlık gelişmeleri, eğitim duyuruları, spor karşılaşmaları, belediye faaliyetleri ve kültürel etkinlikler gibi içerikler vatandaşların günlük hayatını doğrudan etkilemektedir. Ancak bu haberler farklı kaynaklarda dağınık biçimde yayınlanmakta, okuyucuların konumsal ilişkileri kavraması güçleşmektedir.
 
 Bu proje kapsamında, Kocaeli iline ait beş farklı yerel haber kaynağından otomatik olarak haber toplayan, bu haberleri sınıflandıran ve Google Maps üzerinde interaktif olarak görselleştiren bir web uygulaması geliştirilmiştir. Sistem, haberlerin coğrafi dağılımını görsel olarak sunarak kullanıcılara bütüncül bir bakış açısı sağlamaktadır.
 
 Projenin temel hedefleri şu şekilde özetlenebilir:
 \begin{itemize}
     \item Beş farklı yerel haber kaynağından otomatik ve periyodik veri toplama
-    \item Haberlerin beş kategoriye (trafik kazası, yangın, elektrik kesintisi, hırsızlık, kültürel etkinlik) otomatik sınıflandırılması
+    \item Haberlerin on kategoriye (trafik kazası, yangın, elektrik kesintisi, hırsızlık, vefat, sağlık, eğitim, spor, yerel yönetim, kültürel etkinlik) otomatik sınıflandırılması
     \item Embedding tabanlı metin benzerliği analizi ile mükerrer haber tespiti
     \item Haber metinlerinden konum bilgisi çıkarımı ve geocoding ile koordinat dönüşümü
     \item Google Maps üzerinde kategori bazlı, filtrelenebilir interaktif görselleştirme
@@ -232,7 +232,7 @@ Benzerlik oranı $\geq 0.90$ olan haberler aynı haber kabul edilir ve \texttt{d
 
 \subsection{Haber Sınıflandırma}
 
-\texttt{NewsClassifier} sınıfı, anahtar kelime tabanlı bir sınıflandırma algoritması kullanmaktadır. Beş ana kategori tanımlanmıştır:
+\texttt{NewsClassifier} sınıfı, anahtar kelime tabanlı bir sınıflandırma algoritması kullanmaktadır. Toplam on ana kategori tanımlanmıştır:
 
 \begin{table}[H]
     \centering
@@ -243,10 +243,15 @@ Benzerlik oranı $\geq 0.90$ olan haberler aynı haber kabul edilir ve \texttt{d
         \textbf{Öncelik} & \textbf{Haber Türü} & \textbf{Anahtar Kelime Sayısı} \\
         \hline
         1 & Yangın & 22 \\
-        2 & Trafik Kazası & 28 \\
-        3 & Hırsızlık & 28 \\
-        4 & Elektrik Kesintisi & 21 \\
-        5 & Kültürel Etkinlikler & 34 \\
+        2 & Trafik Kazası & 18 \\
+        3 & Hırsızlık & 31 \\
+        4 & Elektrik Kesintisi & 22 \\
+        5 & Vefat & 5 \\
+        6 & Sağlık & 20 \\
+        7 & Eğitim & 21 \\
+        8 & Spor & 20 \\
+        9 & Yerel Yönetim & 24 \\
+        10 & Kültürel Etkinlikler & 35 \\
         \hline
     \end{tabular}
 \end{table}
@@ -259,7 +264,21 @@ Skor hesaplama mekanizması şu şekilde çalışmaktadır:
     \item Başlıkta güçlü eşleşme: $\times 5$ çarpan
 \end{itemize}
 
-Eşit skor durumunda düşük öncelik numaralı kategori seçilir (Yangın~$>$~Trafik~$>$~Hırsızlık~$>$~Elektrik~$>$~Kültürel). Hiçbir kategoriye girmeyen haberler ``Diğer'' olarak etiketlenir.
+Eşit skor durumunda düşük öncelik numaralı kategori seçilir (Yangın~$>$~Trafik~$>$~Hırsızlık~$>$~Elektrik~$>$~Vefat~$>$~Sağlık~$>$~Eğitim~$>$~Spor~$>$~Yerel Yönetim~$>$~Kültürel). Hiçbir kategoriye girmeyen haberler ``Diğer'' olarak etiketlenir.
+
+Raporda kullanılan anahtar kelimeler kategori bazında aşağıda listelenmiştir:
+\begin{itemize}
+    \item \textbf{Yangın:} yangın, yangin, yandı, yanıyor, tutuştu, alevler, alev aldı, alev, itfaiye, söndürme, söndürüldü, dumanlı, duman, küle döndü, kül oldu, yangın çıktı, kundaklama, kundak, yanarak, yangın ihbarı, yangında, yanmış.
+    \item \textbf{Trafik Kazası:} trafik kazası, feci kaza, zincirleme, çarpışma, çarpıştı, takla attı, devrildi, yoldan çıktı, savruldu, otomobil, motosiklet, kamyon, tır, minibüs, otobüs, sürücü, araç, yaya çarpması.
+    \item \textbf{Hırsızlık:} hırsızlık, hırsız, çalındı, çaldı, çalınan, soygun, soyuldu, gasp, gaspçı, dolandırıcılık, dolandırıcı, kapkaç, kapkaççı, suçlu, suçlular, yakalandı, gözaltı, tutuklama, tutuklandı, polis, jandarma, operasyon, baskın, şüpheli, şüpheliler, hapis, ceza, emniyet, asayiş, suç, silahlı.
+    \item \textbf{Elektrik Kesintisi:} elektrik kesintisi, elektrik kesinti, elektrikler kesildi, elektrik kesildi, enerji kesintisi, elektriksiz, karanlıkta kaldı, karanlık, trafo, trafo arızası, enerji arızası, elektrik arızası, kesinti programı, planlı kesinti, elektrik verilecek, elektrikler geldi, sedaş, başkent edaş, enerji dağıtım, voltaj, akım, jeneratör.
+    \item \textbf{Vefat:} vefat etti, hayatını kaybetti, yaşamını yitirdi, son yolculuğuna uğurlandı, hayata gözlerini yumdu.
+    \item \textbf{Sağlık:} sağlık, saglik, hastane, doktor, hekim, hasta, tedavi, muayene, ameliyat, operasyon, virüs, virus, enfeksiyon, salgın, aşı, poliklinik, acil servis, yoğun bakım, ambulans, sağlık çalışanı.
+    \item \textbf{Eğitim:} okul, öğrenci, ogrenci, öğretmen, ogretmen, eğitim, egitim, üniversite, universite, sınav, sinav, ders, akademik, mezuniyet, karne, burs, yurt, kampüs, kampus, müdür, mudur.
+    \item \textbf{Spor:} spor, maç, mac, futbol, basketbol, voleybol, gol, puan, lig, takım, takim, kulüp, kulup, taraftar, antrenör, antrenman, teknik direktör, transfer, şampiyona, turnuva.
+    \item \textbf{Yerel Yönetim:} belediye, büyükşehir, buyuksehir, başkan, baskan, meclis, encümen, encumen, muhtar, valilik, kaymakamlık, kaymakamlik, altyapı, altyapi, yol çalışması, asfalt, ihale, proje, duyuru, açılış, hizmet binası, park, ulaşım, ulasim.
+    \item \textbf{Kültürel Etkinlikler:} etkinlik, konser, sergi, tiyatro, festival, gösteri, sahne, sanat, kültür, müzik, dans, bale, sinema, film, söyleşi, panel, seminer, workshop, atölye, fuar, kermes, şenlik, kutlama, anma, açılış, ödül, yarışma, müze, kütüphane, gala, performans, resital, orkestra, koro, halk oyunları.
+\end{itemize}
 
 \subsection{Konum Bilgisi Çıkarımı}
 

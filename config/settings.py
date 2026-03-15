@@ -22,7 +22,7 @@ class Config:
     # Flask Ayarları
     FLASK_ENV = os.getenv("FLASK_ENV", "development")
     FLASK_DEBUG = os.getenv("FLASK_DEBUG", "True").lower() == "true"
-    FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))
+    FLASK_PORT = int(os.getenv("FLASK_PORT", 5001))
 
     # Scraping Ayarları
     SCRAPING_DAYS = int(os.getenv("SCRAPING_DAYS", 3))
@@ -84,6 +84,36 @@ class Config:
             "color": "#7C3AED",
             "icon": "🔒",
             "marker_color": "purple",
+        },
+        "vefat": {
+            "label": "Vefat",
+            "color": "#475569",
+            "icon": "🕊️",
+            "marker_color": "slate",
+        },
+        "saglik": {
+            "label": "Sağlık",
+            "color": "#059669",
+            "icon": "🩺",
+            "marker_color": "green",
+        },
+        "egitim": {
+            "label": "Eğitim",
+            "color": "#0F766E",
+            "icon": "🎓",
+            "marker_color": "teal",
+        },
+        "spor": {
+            "label": "Spor",
+            "color": "#16A34A",
+            "icon": "⚽",
+            "marker_color": "green",
+        },
+        "yerel_yonetim": {
+            "label": "Yerel Yönetim",
+            "color": "#8B5CF6",
+            "icon": "🏛️",
+            "marker_color": "violet",
         },
         "kulturel_etkinlik": {
             "label": "Kültürel Etkinlikler",
