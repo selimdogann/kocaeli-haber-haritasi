@@ -86,6 +86,14 @@ function markerIkonlariniHazirla() {
                 <path d="M0,-3 C0,-3 -2.8,0 -2.8,2 C-2.8,3.5 -1.5,4.8 0,4.8 C1.5,4.8 2.8,3.5 2.8,2 C2.8,0 0,-3 0,-3Z" fill="#EA580C" opacity="0.5"/>
             </g>`),
 
+        // Afet ve Acil Durum — koyu kirmizi badge, beyaz uyari
+        afet_acil_durum: pinSvgOlustur('#B91C1C',
+            `<g fill="#fff" transform="translate(20,18)">
+                <path d="M0,-8 L8,7 H-8 Z"/>
+                <rect x="-1.2" y="-3.5" width="2.4" height="6" rx="1" fill="#B91C1C"/>
+                <circle cx="0" cy="4.5" r="1.4" fill="#B91C1C"/>
+            </g>`),
+
         // Hırsızlık — mor badge, beyaz gözlük/maske ikonu
         hirsizlik: pinSvgOlustur('#7C3AED',
             `<g fill="#fff" transform="translate(20,18)">
@@ -140,6 +148,38 @@ function markerIkonlariniHazirla() {
                 <rect x="-1.1" y="-1.5" width="2.2" height="8"/>
                 <rect x="4.3" y="-1.5" width="2.2" height="8"/>
                 <rect x="-8" y="6.5" width="16" height="2"/>
+            </g>`),
+
+        // Toplumsal Gündem — amber badge, beyaz tokalasma
+        toplumsal_gundem: pinSvgOlustur('#C2410C',
+            `<g fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="translate(20,18)">
+                <path d="M-7,-1 L-3,-1 L-1,2 L2,2 L4,-1 L7,-1"/>
+                <path d="M-4,-1 L-6,3 L-3,5 L-1,2"/>
+                <path d="M4,-1 L6,3 L3,5 L1,2"/>
+            </g>`),
+
+        // Ekonomi — altin badge, beyaz canta
+        ekonomi: pinSvgOlustur('#CA8A04',
+            `<g fill="#fff" transform="translate(20,18)">
+                <rect x="-7" y="-3" width="14" height="10" rx="2"/>
+                <path d="M-3,-3 V-5 C-3,-6.2 -2.2,-7 -1,-7 H1 C2.2,-7 3,-6.2 3,-5 V-3" fill="none" stroke="#fff" stroke-width="1.7"/>
+                <rect x="-1.6" y="0" width="3.2" height="2" rx="0.6" fill="#CA8A04"/>
+            </g>`),
+
+        // Kamu Duyurusu — gok mavi badge, beyaz megafon
+        kamu_duyurusu: pinSvgOlustur('#0EA5E9',
+            `<g fill="#fff" transform="translate(20,18)">
+                <path d="M-6,-1 L1,-5 V5 L-6,1 Z"/>
+                <rect x="1" y="-2" width="2.2" height="4" rx="1"/>
+                <path d="M-5,2 L-3,7" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+            </g>`),
+
+        // Medya ve Magazin — pembe badge, beyaz klaket
+        medya_magazin: pinSvgOlustur('#DB2777',
+            `<g fill="#fff" transform="translate(20,18)">
+                <rect x="-7" y="-1.5" width="14" height="8.5" rx="1.5"/>
+                <path d="M-7,-5.5 H7 V-1.5 H-7 Z"/>
+                <path d="M-4,-5.5 L-1,-1.5 M0,-5.5 L3,-1.5 M4,-5.5 L7,-1.5" stroke="#DB2777" stroke-width="1.5"/>
             </g>`),
 
         // Elektrik Kesintisi — koyu badge, sarı şimşek
