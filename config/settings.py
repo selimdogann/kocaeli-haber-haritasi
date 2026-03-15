@@ -79,6 +79,12 @@ class Config:
             "icon": "⚡",
             "marker_color": "yellow",
         },
+        "afet_acil_durum": {
+            "label": "Afet ve Acil Durum",
+            "color": "#B91C1C",
+            "icon": "🌪️",
+            "marker_color": "darkred",
+        },
         "hirsizlik": {
             "label": "Hırsızlık",
             "color": "#7C3AED",
@@ -114,6 +120,30 @@ class Config:
             "color": "#8B5CF6",
             "icon": "🏛️",
             "marker_color": "violet",
+        },
+        "toplumsal_gundem": {
+            "label": "Toplumsal Gündem",
+            "color": "#C2410C",
+            "icon": "🤝",
+            "marker_color": "amber",
+        },
+        "ekonomi": {
+            "label": "Ekonomi",
+            "color": "#CA8A04",
+            "icon": "💼",
+            "marker_color": "gold",
+        },
+        "kamu_duyurusu": {
+            "label": "Kamu Duyurusu",
+            "color": "#0EA5E9",
+            "icon": "📢",
+            "marker_color": "sky",
+        },
+        "medya_magazin": {
+            "label": "Medya ve Magazin",
+            "color": "#DB2777",
+            "icon": "🎬",
+            "marker_color": "pink",
         },
         "kulturel_etkinlik": {
             "label": "Kültürel Etkinlikler",
