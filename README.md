@@ -53,9 +53,15 @@ Bu proje, Kocaeli yerel haber sitelerinden belirlenen haber türlerine ait haber
 |-------|-----------|--------------|
 | 🚗 | Trafik Kazası | Kırmızı |
 | 🔥 | Yangın | Turuncu |
-| ⚡ | Elektrik Kesintisi | Sarı |
+| ⚡ | Elektrik Kesintisi | Koyu Lacivert |
 | 🔒 | Hırsızlık | Mor |
+| 🕊️ | Vefat | Koyu Gri |
+| 🩺 | Sağlık | Yeşil |
+| 🎓 | Eğitim | Turkuaz |
+| ⚽ | Spor | Yeşil |
+| 🏛️ | Yerel Yönetim | Mor-Mavi |
 | 🎭 | Kültürel Etkinlikler | Mavi |
+| 📰 | Diğer | Gri |
 
 ## 🚀 Kurulum
 

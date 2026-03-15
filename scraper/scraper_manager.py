@@ -268,7 +268,8 @@ class ScraperManager:
         #   - Normal kelime eşleşmesi: +1 puan
         #   - Güçlü kelime eşleşmesi: +3 puan
         #   - Başlıkta eşleşme: x2 çarpan (güçlü ise x5)
-        # Öncelik sırası: Yangın > Trafik > Hırsızlık > Elektrik > Kültürel
+        # Öncelik sırası: Yangın > Trafik > Hırsızlık > Elektrik > Vefat >
+        # Sağlık > Eğitim > Spor > Yerel Yönetim > Kültürel
         siniflandirma = self.siniflandirici.siniflandir(
             haber.get("baslik", ""),
             haber.get("icerik", ""),

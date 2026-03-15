@@ -15,6 +15,14 @@ logger = logging.getLogger(__name__)
 class OzgurKocaeliScraper(BaseScraper):
     """Özgür Kocaeli haber sitesi scraper'ı (Daktilo CMS)."""
 
+    IGNORE_PHRASES = [
+        "Yorumunuz",
+        "Topluluk Kuralları",
+        "Oturum aç",
+        "Okunma",
+        "Yazdır",
+    ]
+
     def __init__(self):
         super().__init__(
             kaynak_adi="Özgür Kocaeli",
@@ -34,6 +42,51 @@ class OzgurKocaeliScraper(BaseScraper):
             return False
         # Daktilo CMS haber URL formatı: /haber/{id}/{slug}
         return bool(re.search(r'/haber/\d+/', href))
+
+    def _icerigi_temizle(self, metin: str) -> str:
+        """UI ve yorum kırıntılarını içerikten temizler."""
+        temiz_metin = metin or ""
+        for ifade in self.IGNORE_PHRASES:
+            temiz_metin = temiz_metin.replace(ifade, " ")
+
+        temiz_metin = re.sub(r"\s+", " ", temiz_metin).strip()
+        return temiz_metin
+
+    def _paragraf_metinlerini_topla(self, kapsayici) -> str:
+        """Haber gövdesindeki paragraf metinlerini birleştirir."""
+        if not kapsayici:
+            return ""
+
+        for secici in [
+            "script",
+            "style",
+            "iframe",
+            "aside",
+            "footer",
+            "form",
+            "button",
+            ".comments",
+            ".comment",
+            ".yorum",
+            ".social",
+            ".share",
+            ".related",
+            ".post-tags",
+            ".news-tags",
+        ]:
+            for tag in kapsayici.select(secici):
+                tag.decompose()
+
+        paragraflar = []
+        for p in kapsayici.find_all("p"):
+            metin = self._icerigi_temizle(p.get_text(" ", strip=True))
+            if len(metin) < 30:
+                continue
+            if any(ifade.lower() in metin.lower() for ifade in self.IGNORE_PHRASES):
+                continue
+            paragraflar.append(metin)
+
+        return " ".join(paragraflar)
 
     def haber_listesi_getir(self) -> list:
         """Özgür Kocaeli'den haber linklerini çeker."""
@@ -88,6 +141,8 @@ class OzgurKocaeliScraper(BaseScraper):
 
             # İçerik - Daktilo CMS yapısı
             icerik_seciciler = [
+                ".haber-metni",
+                ".news-detail",
                 ".detail-content", ".news-content", ".content-text",
                 ".post-content", ".entry-content", ".article-body",
                 "article .content", ".news-detail-content",
@@ -95,23 +150,26 @@ class OzgurKocaeliScraper(BaseScraper):
             for secici in icerik_seciciler:
                 icerik = soup.select_one(secici)
                 if icerik:
-                    for tag in icerik.find_all(["script", "style", "iframe", "aside"]):
-                        tag.decompose()
-                    metin = icerik.get_text(separator=" ", strip=True)
+                    metin = self._paragraf_metinlerini_topla(icerik)
                     if len(metin) > 50:
                         haber["icerik"] = metin
                         break
 
             # İçerik bulunamazsa, paragrafları dene
             if not haber.get("icerik"):
-                paragraflar = soup.find_all("p")
-                metin_parcalari = []
-                for p in paragraflar:
-                    metin = p.get_text(strip=True)
-                    if len(metin) > 30 and not metin.startswith(("©", "Cookie", "Veri")):
-                        metin_parcalari.append(metin)
-                if metin_parcalari:
-                    haber["icerik"] = " ".join(metin_parcalari[:10])
+                kapsayici = soup.find("article")
+                if not kapsayici:
+                    kapsayici = soup.find(
+                        "div",
+                        class_=re.compile(
+                            r"(haber|news|detail|content|article)",
+                            re.IGNORECASE,
+                        ),
+                    )
+
+                metin = self._paragraf_metinlerini_topla(kapsayici)
+                if len(metin) > 50:
+                    haber["icerik"] = metin
 
             # Tarih - Önce meta tag, sonra sayfa içi
             meta_tarih = soup.find("meta", property="article:published_time")

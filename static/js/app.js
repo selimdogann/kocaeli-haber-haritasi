@@ -97,6 +97,51 @@ function markerIkonlariniHazirla() {
                 <path d="M-5,4 C-5,4 -2.5,7 0,7 C2.5,7 5,4 5,4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
             </g>`),
 
+        // Vefat — koyu gri badge, beyaz güvercin
+        vefat: pinSvgOlustur('#475569',
+            `<g fill="#fff" transform="translate(20,18)">
+                <path d="M-5,2 C-3,-4 1,-6 5,-4 C3,-2 2,0 3,3 C1,4 -2,5 -5,2Z"/>
+                <path d="M-1,-1 L5,-6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+                <circle cx="4.8" cy="-6.2" r="1.2"/>
+            </g>`),
+
+        // Sağlık — yeşil badge, beyaz sağlık artısı
+        saglik: pinSvgOlustur('#059669',
+            `<g fill="#fff" transform="translate(20,18)">
+                <rect x="-2" y="-7" width="4" height="14" rx="1"/>
+                <rect x="-7" y="-2" width="14" height="4" rx="1"/>
+            </g>`),
+
+        // Eğitim — teal badge, beyaz kep
+        egitim: pinSvgOlustur('#0F766E',
+            `<g fill="#fff" transform="translate(20,18)">
+                <polygon points="0,-7 9,-3 0,1 -9,-3"/>
+                <rect x="-1.5" y="1" width="3" height="6" rx="1"/>
+                <path d="M5,-1 L8,1.5 L8,6" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            </g>`),
+
+        // Spor — yeşil badge, beyaz top
+        spor: pinSvgOlustur('#16A34A',
+            `<g fill="none" stroke="#fff" stroke-width="1.5" transform="translate(20,18)">
+                <circle cx="0" cy="0" r="7" fill="none"/>
+                <polygon points="0,-3 -2,0 0,3 2,0" fill="#fff" stroke="none"/>
+                <path d="M-6,-1 C-4,-2 -3,-4 -2,-6"/>
+                <path d="M6,-1 C4,-2 3,-4 2,-6"/>
+                <path d="M-5,4 C-3,3 -1,3 0,5"/>
+                <path d="M5,4 C3,3 1,3 0,5"/>
+            </g>`),
+
+        // Yerel Yönetim — mor-mavi badge, beyaz bina
+        yerel_yonetim: pinSvgOlustur('#8B5CF6',
+            `<g fill="#fff" transform="translate(20,18)">
+                <polygon points="0,-8 8,-4.5 -8,-4.5"/>
+                <rect x="-7" y="-3.5" width="14" height="2"/>
+                <rect x="-6.5" y="-1.5" width="2.2" height="8"/>
+                <rect x="-1.1" y="-1.5" width="2.2" height="8"/>
+                <rect x="4.3" y="-1.5" width="2.2" height="8"/>
+                <rect x="-8" y="6.5" width="16" height="2"/>
+            </g>`),
+
         // Elektrik Kesintisi — koyu badge, sarı şimşek
         elektrik_kesintisi: pinSvgOlustur('#1e293b',
             `<polygon points="22,8 16,17.5 19,17.5 16,26 24,15.5 20.5,15.5 22.5,8" fill="#FACC15"/>`),
