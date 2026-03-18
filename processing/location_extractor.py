@@ -6,8 +6,8 @@ Kocaeli ili sınırları içindeki mahalle, sokak, cadde gibi
 konum bilgilerini tespit eder.
 """
 
-import re
 import logging
+import re
 from config.settings import Config
 
 logger = logging.getLogger(__name__)
@@ -16,59 +16,143 @@ logger = logging.getLogger(__name__)
 class LocationExtractor:
     """Haber metinlerinden konum bilgisi çıkaran sınıf."""
 
-    # Kocaeli ilçeleri
     ILCELER = [ilce.lower() for ilce in Config.KOCAELI_DISTRICTS]
 
-    # Konum belirten anahtar kelime kalıpları
     KONUM_KALIPLARI = [
-        # İlçe + Mahalle kalıpları
-        r"(?P<ilce>[A-ZÇĞİÖŞÜa-zçğıöşü]+)\s+ilçesi(?:nin|nde|ne)?\s+(?P<mahalle>[A-ZÇĞİÖŞÜa-zçğıöşü\s]+?)\s+(?:mahallesi|mah\.?)",
-        # Mahalle adı kalıbı
-        r"(?P<mahalle>[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*)\s+(?:Mahallesi|mahallesi|Mah\.?|mah\.?)",
-        # Cadde/Sokak kalıbı
+        r"(?P<ilce>[A-ZÇĞİÖŞÜa-zçğıöşü]+)\s+ilçesi(?:nin|nde|ne)?\s+(?P<mahalle>[A-ZÇĞİÖŞÜa-zçğıöşü\s]+?)\s+(?:mahallesi|mah\.)",
+        r"(?P<mahalle>[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*)\s+(?:Mahallesi|mahallesi|Mah\.|mah\.)",
         r"(?P<cadde>[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+)*)\s+(?:Caddesi|caddesi|Cad\.?|cad\.?|Bulvarı|bulvarı|Blv\.?|blv\.?)",
         r"(?P<sokak>[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+)*)\s+(?:Sokağı?|sokağı?|Sok\.?|sok\.?)",
-        # Yol/Otoyol kalıbı
         r"(?:D-?\d+|O-?\d+|TEM|E-?\d+)\s*(?:karayolu|otoyolu?|yolu)",
         r"(?P<yol>(?:Kocaeli|İstanbul|Ankara|Bursa|Yalova|Sakarya)\s*[-–]\s*(?:Kocaeli|İstanbul|Ankara|Bursa|Yalova|Sakarya))\s+(?:karayolu|otoyolu?|yolu)",
-        # Semt/Bölge kalıpları
         r"(?P<semt>[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)*)\s+(?:semtinde|bölgesinde|mevkiinde|mevkisinde|civarında|yakınında|karşısında|arkasında|önünde)",
-        # "X'de, X'da" kalıbı (yer belirten)
         r"(?:Kocaeli|İzmit|Gebze|Darıca|Çayırova|Dilovası|Körfez|Derince|Gölcük|Karamürsel|Başiskele|Kartepe|Kandıra)'?\s*(?:de|da|te|ta)\b",
     ]
 
-    # Önemli yer isimleri ve landmark'lar
     BILINEN_YERLER = [
-        # Sanayi bölgeleri
-        "Gebze Organize Sanayi", "GOSB", "Dilovası Organize Sanayi",
+        "Gebze Organize Sanayi",
+        "GOSB",
+        "Dilovası Organize Sanayi",
         "Arslanbey Organize Sanayi",
-        # Hastaneler
-        "Kocaeli Üniversitesi Hastanesi", "Derince Eğitim ve Araştırma",
-        "Gebze Fatih Devlet Hastanesi", "Seka Devlet Hastanesi",
-        # Meydanlar ve parklar
-        "Cumhuriyet Meydanı", "Seka Park", "Ormanya",
-        "Maşukiye", "Kartepe Kayak Merkezi",
-        # AVM'ler
-        "Symbol AVM", "Gebze Center", "41 Burda AVM",
-        # Limanlar
-        "İzmit Körfez Geçiş Köprüsü", "Osmangazi Köprüsü",
-        "Derince Limanı", "Hereke",
+        "Kocaeli Üniversitesi Hastanesi",
+        "Derince Eğitim ve Araştırma",
+        "Gebze Fatih Devlet Hastanesi",
+        "Seka Devlet Hastanesi",
+        "Cumhuriyet Meydanı",
+        "Seka Park",
+        "Ormanya",
+        "Maşukiye",
+        "Kartepe Kayak Merkezi",
+        "Kocaeli Stadı",
+        "Kocaeli Stadyumu",
+        "İzmit Kocaeli Stadı",
+        "Yıldız Entegre Kocaeli Stadyumu",
+        "Brunga Tesisleri",
+        "Körfez Brunga Tesisleri",
+        "Symbol AVM",
+        "Gebze Center",
+        "41 Burda AVM",
+        "İzmit Körfez Geçiş Köprüsü",
+        "Osmangazi Köprüsü",
+        "Derince Limanı",
+        "Hereke",
+    ]
+    BILINEN_YER_ILCE_HARITASI = {
+        "Kocaeli Stadı": "İzmit",
+        "Kocaeli Stadyumu": "İzmit",
+        "İzmit Kocaeli Stadı": "İzmit",
+        "Yıldız Entegre Kocaeli Stadyumu": "İzmit",
+        "Brunga Tesisleri": "Körfez",
+        "Körfez Brunga Tesisleri": "Körfez",
+    }
+
+    # Extendable special location aliases feed both known-place and sports logic.
+    OZEL_KONUM_IPUCLARI = {
+        "Kocaeli Stadyumu": [
+            "kocaelispor",
+            "kocaeli stadyumu",
+            "kocaeli stadı",
+            "izmit stadyumu",
+            "izmit kocaeli stadı",
+            "yıldız entegre kocaeli stadyumu",
+        ],
+        "Brunga Tesisleri": [
+            "brunga tesisleri",
+            "körfez brunga tesisleri",
+        ],
+    }
+    KOCELI_STADYUMU_MAC_IPUCLARI = [
+        "konuk ediyor",
+        "sahasında",
+        "evinde",
+        "iç sahada",
+        "tribün",
+        "tribünden",
+        "seyirci",
+        "stadyum",
+        "taraftar",
+        "taraftarlar",
+        "karşılaşma",
+        "maç",
+        "rakip",
+        "oynanacak",
+    ]
+    DEPLASMAN_IPUCLARI = [
+        "deplasman",
+        "deplasmanda",
+        "dış sahada",
+        "alanyaspor - kocaelispor",
+        "kocaelispor - alanyaspor",
     ]
 
     NER_ETIKETLERI = {"LOC", "ORG", "MISC"}
     NER_KONUM_IPUCLARI = [
-        "mahallesi", "mah.", "caddesi", "cad.", "sokağı", "sok.",
-        "bulvarı", "blv.", "park", "meydanı", "avm", "hastanesi",
-        "devlet hastanesi", "limanı", "köprüsü", "organize sanayi",
-        "kayak merkezi", "stadyumu", "terminali",
+        "mahallesi",
+        "mah.",
+        "caddesi",
+        "cad.",
+        "sokağı",
+        "sok.",
+        "bulvarı",
+        "blv.",
+        "park",
+        "meydanı",
+        "avm",
+        "hastanesi",
+        "devlet hastanesi",
+        "limanı",
+        "köprüsü",
+        "organize sanayi",
+        "kayak merkezi",
+        "stadyumu",
+        "terminali",
+        "tesisleri",
     ]
+
+    KAYNAK_SKORLARI = {
+        "bilinen_yer": 70,
+        "spor_mekani": 75,
+        "cadde_sokak": 48,
+        "mahalle": 34,
+        "regex": 28,
+        "ner": 20,
+        "ilce": 10,
+    }
 
     def __init__(self):
         """Konum çıkarıcıyı başlatır."""
         self.derli_kaliplar = [
-            re.compile(kalip, re.UNICODE | re.IGNORECASE)
+            # Baş harf mantığını korumak için regex adaylarında IGNORECASE kullanılmıyor.
+            re.compile(kalip, re.UNICODE)
             for kalip in self.KONUM_KALIPLARI
         ]
+        self.ilce_patternleri = {
+            ilce: re.compile(
+                r"\b" + re.escape(ilce) + r"\b",
+                re.IGNORECASE | re.UNICODE,
+            )
+            for ilce in Config.KOCAELI_DISTRICTS
+        }
         self.ner_pipeline = None
         self.ner_yukleme_denendi = False
 
@@ -76,21 +160,17 @@ class LocationExtractor:
         """
         Haber başlık ve içeriğinden konum bilgisi çıkarır.
 
-        Args:
-            baslik: Haber başlığı
-            icerik: Haber içeriği
-
         Returns:
             dict: {
-                "konum_metni": str,      # En spesifik konum metni
-                "ilce": str,             # Tespit edilen ilçe
-                "mahalle": str,          # Tespit edilen mahalle
-                "cadde_sokak": str,      # Tespit edilen cadde/sokak
-                "tum_konumlar": list,    # Tespit edilen tüm konum bilgileri
-                "geocoding_sorgusu": str # Geocoding API'ye gönderilecek sorgu
+                "konum_metni": str,
+                "ilce": str,
+                "mahalle": str,
+                "cadde_sokak": str,
+                "tum_konumlar": list,
+                "geocoding_sorgusu": str
             }
         """
-        birlesik_metin = f"{baslik} {icerik}"
+        birlesik_metin = f"{baslik} {icerik}".strip()
         sonuc = {
             "konum_metni": None,
             "ilce": None,
@@ -100,67 +180,271 @@ class LocationExtractor:
             "geocoding_sorgusu": None,
         }
 
-        # 1. İlçe tespiti
-        ilce = self._ilce_tespit_et(birlesik_metin)
-        if ilce:
-            sonuc["ilce"] = ilce
+        adaylar = self._tum_adaylari_topla(birlesik_metin)
+        en_iyi_aday = self._en_iyi_adayi_sec(adaylar)
 
-        # 2. Mahalle tespiti
-        mahalle = self._mahalle_tespit_et(birlesik_metin)
-        if mahalle:
-            sonuc["mahalle"] = mahalle
+        if not en_iyi_aday:
+            return sonuc
 
-        # 3. Cadde/Sokak tespiti
-        cadde_sokak = self._cadde_sokak_tespit_et(birlesik_metin)
-        if cadde_sokak:
-            sonuc["cadde_sokak"] = cadde_sokak
+        sonuc["ilce"] = en_iyi_aday.get("ilce")
+        sonuc["mahalle"] = en_iyi_aday.get("mahalle")
+        sonuc["cadde_sokak"] = en_iyi_aday.get("cadde_sokak")
 
-        # 4. Bilinen yer tespiti
-        bilinen_yer = self._bilinen_yer_tespit_et(birlesik_metin)
-
-        # 5. Regex kalıpları ile tüm konumları topla
-        tum_konumlar = self._tum_konumlari_bul(birlesik_metin)
+        tum_konumlar = []
+        for aday in adaylar:
+            for konum in aday.get("tum_konumlar", []):
+                if konum and konum not in tum_konumlar:
+                    tum_konumlar.append(konum)
         sonuc["tum_konumlar"] = tum_konumlar
 
-        # 6. Regex sonuç vermezse NER fallback ile konumu tahmin et
-        if not any([mahalle, cadde_sokak, bilinen_yer, tum_konumlar]):
-            ner_sonuc = self._ner_ile_konum_tespit_et(birlesik_metin)
-            if ner_sonuc:
-                ilce = ilce or ner_sonuc.get("ilce")
-                mahalle = mahalle or ner_sonuc.get("mahalle")
-                cadde_sokak = cadde_sokak or ner_sonuc.get("cadde_sokak")
-                bilinen_yer = bilinen_yer or ner_sonuc.get("bilinen_yer")
-                if ilce:
-                    sonuc["ilce"] = ilce
-                if mahalle:
-                    sonuc["mahalle"] = mahalle
-                if cadde_sokak:
-                    sonuc["cadde_sokak"] = cadde_sokak
-                for konum in ner_sonuc.get("tum_konumlar", []):
-                    if konum not in sonuc["tum_konumlar"]:
-                        sonuc["tum_konumlar"].append(konum)
-
-        # 7. En spesifik konum metnini oluştur
-        konum_parcalari = []
-
-        if cadde_sokak:
-            konum_parcalari.append(cadde_sokak)
-        if mahalle:
-            konum_parcalari.append(f"{mahalle} Mahallesi")
-        if bilinen_yer:
-            konum_parcalari.append(bilinen_yer)
-        if ilce:
-            konum_parcalari.append(ilce)
-
-        if konum_parcalari:
-            konum_parcalari.append("Kocaeli")
-            sonuc["konum_metni"] = ", ".join(konum_parcalari)
-            sonuc["geocoding_sorgusu"] = sonuc["konum_metni"]
-        elif ilce:
-            sonuc["konum_metni"] = f"{ilce}, Kocaeli"
-            sonuc["geocoding_sorgusu"] = sonuc["konum_metni"]
+        konum_metni = self._aday_konum_metni_olustur(en_iyi_aday)
+        if konum_metni:
+            sonuc["konum_metni"] = konum_metni
+            sonuc["geocoding_sorgusu"] = konum_metni
 
         return sonuc
+
+    def _tum_adaylari_topla(self, metin: str) -> list:
+        """Tüm kaynaklardan gelen konum sinyallerini aday havuzunda toplar."""
+        aday_haritasi = {}
+
+        ilce = self._ilce_tespit_et(metin)
+        if ilce:
+            self._aday_ekle(
+                aday_haritasi,
+                {
+                    "kaynak": "ilce",
+                    "ilce": ilce,
+                    "tum_konumlar": [ilce],
+                },
+            )
+
+        mahalle = self._mahalle_tespit_et(metin)
+        if mahalle:
+            self._aday_ekle(
+                aday_haritasi,
+                {
+                    "kaynak": "mahalle",
+                    "ilce": ilce,
+                    "mahalle": mahalle,
+                    "tum_konumlar": [f"{mahalle} Mahallesi"],
+                },
+            )
+
+        cadde_sokak = self._cadde_sokak_tespit_et(metin)
+        if cadde_sokak:
+            self._aday_ekle(
+                aday_haritasi,
+                {
+                    "kaynak": "cadde_sokak",
+                    "ilce": ilce,
+                    "mahalle": mahalle,
+                    "cadde_sokak": cadde_sokak,
+                    "tum_konumlar": [cadde_sokak],
+                },
+            )
+
+        bilinen_yer = self._bilinen_yer_tespit_et(metin)
+        if bilinen_yer:
+            self._aday_ekle(
+                aday_haritasi,
+                {
+                    "kaynak": "bilinen_yer",
+                    "ilce": self.BILINEN_YER_ILCE_HARITASI.get(bilinen_yer, ilce),
+                    "bilinen_yer": bilinen_yer,
+                    "tum_konumlar": [bilinen_yer],
+                },
+            )
+
+        spor_mekani = self._spor_mekani_tespit_et(metin)
+        if spor_mekani:
+            self._aday_ekle(
+                aday_haritasi,
+                {
+                    "kaynak": "spor_mekani",
+                    "ilce": self.BILINEN_YER_ILCE_HARITASI.get(spor_mekani, ilce),
+                    "bilinen_yer": spor_mekani,
+                    "tum_konumlar": [spor_mekani],
+                },
+            )
+
+        for aday in self._regex_adaylarini_topla(metin, ilce, mahalle, cadde_sokak):
+            self._aday_ekle(aday_haritasi, aday)
+
+        for aday in self._ner_adaylarini_topla(metin):
+            self._aday_ekle(aday_haritasi, aday)
+
+        adaylar = list(aday_haritasi.values())
+        self._aday_skorlarini_dengele(adaylar)
+        return adaylar
+
+    def _aday_ekle(self, aday_haritasi: dict, aday: dict):
+        """Aynı konumu temsil eden adayları tek kayıtta birleştirir."""
+        anahtar = self._aday_anahtari_olustur(aday)
+        aday = {
+            "kaynak": aday.get("kaynak"),
+            "ilce": aday.get("ilce"),
+            "mahalle": aday.get("mahalle"),
+            "cadde_sokak": aday.get("cadde_sokak"),
+            "bilinen_yer": aday.get("bilinen_yer"),
+            "tum_konumlar": list(dict.fromkeys(aday.get("tum_konumlar", []))),
+        }
+        if aday["ilce"] and aday["mahalle"]:
+            aday["mahalle"] = self._ilce_on_ekini_temizle(aday["mahalle"], aday["ilce"])
+        if aday["mahalle"] and aday["cadde_sokak"]:
+            aday["cadde_sokak"] = self._mahalle_on_ekini_temizle(
+                aday["cadde_sokak"], aday["mahalle"]
+            )
+        aday["skor"] = self._aday_skorunu_hesapla(aday)
+
+        mevcut = aday_haritasi.get(anahtar)
+        if not mevcut:
+            aday_haritasi[anahtar] = aday
+            return
+
+        mevcut["tum_konumlar"] = list(
+            dict.fromkeys(mevcut["tum_konumlar"] + aday["tum_konumlar"])
+        )
+        if aday["skor"] > mevcut["skor"]:
+            mevcut.update(
+                {
+                    "kaynak": aday["kaynak"],
+                    "ilce": aday["ilce"] or mevcut.get("ilce"),
+                    "mahalle": aday["mahalle"] or mevcut.get("mahalle"),
+                    "cadde_sokak": aday["cadde_sokak"] or mevcut.get("cadde_sokak"),
+                    "bilinen_yer": aday["bilinen_yer"] or mevcut.get("bilinen_yer"),
+                    "skor": aday["skor"],
+                }
+            )
+
+    def _aday_anahtari_olustur(self, aday: dict) -> str:
+        return "|".join(
+            [
+                aday.get("bilinen_yer") or "",
+                aday.get("cadde_sokak") or "",
+                aday.get("mahalle") or "",
+                aday.get("ilce") or "",
+            ]
+        )
+
+    def _aday_skorunu_hesapla(self, aday: dict) -> int:
+        """Daha spesifik ve daha güvenilir kaynakları yukarı taşır."""
+        skor = self.KAYNAK_SKORLARI.get(aday.get("kaynak"), 0)
+
+        if aday.get("bilinen_yer"):
+            skor += 28
+        if aday.get("cadde_sokak"):
+            skor += 18
+        if aday.get("mahalle"):
+            skor += 12
+        if aday.get("ilce"):
+            skor += 4
+
+        if aday.get("cadde_sokak") and aday.get("mahalle"):
+            skor += 12
+        if aday.get("bilinen_yer") and aday.get("ilce"):
+            skor += 6
+
+        return skor
+
+    def _aday_skorlarini_dengele(self, adaylar: list):
+        """İlçe-only adayları, daha spesifik adaylar varken zayıflat."""
+        if not adaylar:
+            return
+
+        daha_spesifik_var = any(
+            aday.get("bilinen_yer") or aday.get("mahalle") or aday.get("cadde_sokak")
+            for aday in adaylar
+        )
+        sabit_mekan_var = any(aday.get("bilinen_yer") for aday in adaylar)
+
+        for aday in adaylar:
+            sadece_ilce = (
+                aday.get("ilce")
+                and not aday.get("mahalle")
+                and not aday.get("cadde_sokak")
+                and not aday.get("bilinen_yer")
+            )
+            if sadece_ilce and daha_spesifik_var:
+                aday["skor"] -= 18
+            if aday.get("kaynak") == "ner" and sabit_mekan_var and not aday.get("bilinen_yer"):
+                aday["skor"] -= 8
+
+    def _en_iyi_adayi_sec(self, adaylar: list) -> dict:
+        """Adaylar içinden en yüksek skorlu ve en spesifik olanı seç."""
+        if not adaylar:
+            return None
+
+        return max(
+            adaylar,
+            key=lambda aday: (
+                aday.get("skor", 0),
+                bool(aday.get("bilinen_yer")),
+                bool(aday.get("cadde_sokak")),
+                bool(aday.get("mahalle")),
+                len(aday.get("tum_konumlar", [])),
+            ),
+        )
+
+    def _aday_konum_metni_olustur(self, aday: dict) -> str:
+        """Seçilen adayı mevcut geocoder ile uyumlu sorguya dönüştür."""
+        if not aday:
+            return None
+
+        parcalar = []
+        if aday.get("cadde_sokak"):
+            parcalar.append(aday["cadde_sokak"])
+        if aday.get("mahalle"):
+            parcalar.append(f"{aday['mahalle']} Mahallesi")
+        if aday.get("bilinen_yer"):
+            parcalar.append(aday["bilinen_yer"])
+        if aday.get("ilce"):
+            parcalar.append(aday["ilce"])
+
+        if not parcalar:
+            return None
+
+        if parcalar[-1] != "Kocaeli":
+            parcalar.append("Kocaeli")
+        return ", ".join(dict.fromkeys(parcalar))
+
+    def _regex_adaylarini_topla(
+        self,
+        metin: str,
+        varsayilan_ilce: str,
+        varsayilan_mahalle: str,
+        varsayilan_cadde: str,
+    ) -> list:
+        """Regex eşleşmelerini aday yapısına çevir."""
+        adaylar = []
+        for kalip in self.derli_kaliplar:
+            for eslesme in kalip.finditer(metin):
+                ham_konum = eslesme.group(0).strip()
+                if not ham_konum:
+                    continue
+
+                grup_verisi = {
+                    anahtar: (deger.strip() if deger else None)
+                    for anahtar, deger in eslesme.groupdict().items()
+                }
+                cadde_sokak = (
+                    grup_verisi.get("cadde")
+                    or grup_verisi.get("sokak")
+                    or grup_verisi.get("yol")
+                    or self._cadde_sokak_tespit_et(ham_konum)
+                )
+                mahalle = grup_verisi.get("mahalle") or self._mahalle_tespit_et(ham_konum)
+                adaylar.append(
+                    {
+                        "kaynak": "regex",
+                        "ilce": grup_verisi.get("ilce") or self._ilce_tespit_et(ham_konum) or varsayilan_ilce,
+                        "mahalle": mahalle,
+                        "cadde_sokak": cadde_sokak,
+                        "bilinen_yer": self._bilinen_yer_tespit_et(ham_konum),
+                        "tum_konumlar": [ham_konum],
+                    }
+                )
+        return adaylar
 
     def _ner_pipeline_getir(self):
         """NER pipeline'ını ilk ihtiyaçta yükler."""
@@ -186,55 +470,64 @@ class LocationExtractor:
 
         return self.ner_pipeline
 
-    def _ner_ile_konum_tespit_et(self, metin: str) -> dict:
-        """Regex sonuç vermediğinde NER ile konum adayı çıkarır."""
+    def _ner_adaylarini_topla(self, metin: str) -> list:
+        """NER çıktısını fallback yerine ek aday kaynağı olarak kullan."""
         ner_pipeline = self._ner_pipeline_getir()
         if not ner_pipeline or not metin:
-            return None
+            return []
 
         try:
             varliklar = ner_pipeline(metin)
         except Exception as e:
             logger.warning(f"NER ile konum tespiti başarısız: {e}")
-            return None
+            return []
 
         adaylar = []
+        gorulenler = set()
         for varlik in varliklar:
             etiket = (varlik.get("entity_group") or varlik.get("entity") or "").upper()
             etiket = etiket.split("-")[-1]
             if etiket not in self.NER_ETIKETLERI:
                 continue
 
-            aday = self._ner_adayini_temizle(varlik.get("word", ""))
-            if not aday:
+            aday_metin = self._ner_adayini_temizle(varlik.get("word", ""))
+            if not aday_metin or aday_metin in gorulenler:
                 continue
-            if not self._ner_konum_adayi_mi(aday):
+            if not self._ner_konum_adayi_mi(aday_metin):
                 continue
-            if aday not in adaylar:
-                adaylar.append(aday)
 
-        if not adaylar:
+            gorulenler.add(aday_metin)
+            adaylar.append(
+                {
+                    "kaynak": "ner",
+                    "ilce": self._ilce_tespit_et(aday_metin),
+                    "mahalle": self._mahalle_tespit_et(aday_metin),
+                    "cadde_sokak": self._cadde_sokak_tespit_et(aday_metin),
+                    "bilinen_yer": self._bilinen_yer_tespit_et(aday_metin),
+                    "tum_konumlar": [aday_metin],
+                }
+            )
+
+        return adaylar
+
+    def _ner_ile_konum_tespit_et(self, metin: str) -> dict:
+        """Mevcut uyumluluk için NER içindeki en iyi adayı döndür."""
+        adaylar = self._ner_adaylarini_topla(metin)
+        en_iyi_aday = self._en_iyi_adayi_sec(adaylar)
+        if not en_iyi_aday:
             return None
-
-        en_iyi_aday = max(adaylar, key=self._ner_konum_puani)
-        ilce = self._ilce_tespit_et(en_iyi_aday) or self._ilce_tespit_et(metin)
-        mahalle = self._mahalle_tespit_et(en_iyi_aday)
-        cadde_sokak = self._cadde_sokak_tespit_et(en_iyi_aday)
-        bilinen_yer = self._bilinen_yer_tespit_et(en_iyi_aday)
-
         return {
-            "ilce": ilce,
-            "mahalle": mahalle,
-            "cadde_sokak": cadde_sokak,
-            "bilinen_yer": bilinen_yer or en_iyi_aday,
-            "tum_konumlar": adaylar,
+            "ilce": en_iyi_aday.get("ilce"),
+            "mahalle": en_iyi_aday.get("mahalle"),
+            "cadde_sokak": en_iyi_aday.get("cadde_sokak"),
+            "bilinen_yer": en_iyi_aday.get("bilinen_yer"),
+            "tum_konumlar": en_iyi_aday.get("tum_konumlar", []),
         }
 
     def _ner_adayini_temizle(self, metin: str) -> str:
         """NER çıktısındaki aday metni normalize eder."""
         temiz = (metin or "").replace("##", "").strip(" .,;:!?()[]{}\"'")
-        temiz = re.sub(r"\s+", " ", temiz).strip()
-        return temiz
+        return re.sub(r"\s+", " ", temiz).strip()
 
     def _ner_konum_adayi_mi(self, aday: str) -> bool:
         """NER adayının konum olma ihtimalini kaba kurallarla filtreler."""
@@ -248,71 +541,70 @@ class LocationExtractor:
         if any(ipucu in aday_lower for ipucu in self.NER_KONUM_IPUCLARI):
             return True
 
-        # En az iki kelimeli özel isim gruplarını yedek aday olarak kabul et.
         return len(aday.split()) >= 2
 
-    def _ner_konum_puani(self, aday: str) -> int:
-        """NER adaylarını konum özgüllüğüne göre sıralar."""
-        puan = len(aday.split())
-        aday_lower = aday.lower()
+    def _ilce_on_ekini_temizle(self, metin: str, ilce: str) -> str:
+        """Mahalle gibi adaylarda başa yapışan ilçe adını kaldır."""
+        if not metin or not ilce:
+            return metin
 
-        if self._ilce_tespit_et(aday):
-            puan += 3
-        if self._bilinen_yer_tespit_et(aday):
-            puan += 5
-        if any(ipucu in aday_lower for ipucu in self.NER_KONUM_IPUCLARI):
-            puan += 4
+        on_ek = f"{ilce} "
+        if metin.startswith(on_ek):
+            return metin[len(on_ek):].strip()
+        return metin
 
-        return puan
+    def _mahalle_on_ekini_temizle(self, metin: str, mahalle: str) -> str:
+        """Cadde adaylarında öne yapışan mahalle bilgisini temizle."""
+        if not metin or not mahalle:
+            return metin
+
+        on_ek = f"{mahalle} Mahallesi "
+        if metin.startswith(on_ek):
+            return metin[len(on_ek):].strip()
+        return metin
 
     def _ilce_tespit_et(self, metin: str) -> str:
         """İlçe adını tespit eder."""
-        for ilce in Config.KOCAELI_DISTRICTS:
-            # Tam kelime eşleşmesi
-            pattern = re.compile(
-                r"\b" + re.escape(ilce) + r"\b",
-                re.IGNORECASE | re.UNICODE,
-            )
+        for ilce, pattern in self.ilce_patternleri.items():
             if pattern.search(metin):
                 return ilce
-
         return None
 
     def _mahalle_tespit_et(self, metin: str) -> str:
         """Mahalle adını tespit eder."""
-        # Mahalle kalıpları
         mahalle_kaliplari = [
-            r"([A-ZÇĞİÖŞÜa-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+)*)\s+(?:Mahallesi|mahallesi|Mah\.?|mah\.?)",
+            r"\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+){0,3})\s+(?:Mahallesi|mahallesi|Mah\.|mah\.)\b",
         ]
 
         for kalip in mahalle_kaliplari:
             eslesme = re.search(kalip, metin, re.UNICODE)
             if eslesme:
                 mahalle = eslesme.group(1).strip()
-                # Çok kısa veya anlamsız sonuçları filtrele
                 if len(mahalle) > 2:
                     return mahalle
-
         return None
 
     def _cadde_sokak_tespit_et(self, metin: str) -> str:
         """Cadde veya sokak adını tespit eder."""
         kaliplar = [
-            r"([A-ZÇĞİÖŞÜa-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+)*)\s+(?:Caddesi|caddesi|Cad\.?|cad\.?)",
-            r"([A-ZÇĞİÖŞÜa-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+)*)\s+(?:Sokağı?|sokağı?|Sok\.?|sok\.?)",
-            r"([A-ZÇĞİÖŞÜa-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+)*)\s+(?:Bulvarı|bulvarı|Blv\.?|blv\.?)",
+            r"\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+){0,4})\s+(?:Caddesi|caddesi|Cad\.?|cad\.?)\b",
+            r"\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+){0,4})\s+(?:Sokağı?|sokağı?|Sok\.?|sok\.?)\b",
+            r"\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ0-9][a-zçğıöşü0-9]+){0,4})\s+(?:Bulvarı|bulvarı|Blv\.?|blv\.?)\b",
         ]
 
         for kalip in kaliplar:
             eslesme = re.search(kalip, metin, re.UNICODE)
             if eslesme:
                 return eslesme.group(0).strip()
-
         return None
 
     def _bilinen_yer_tespit_et(self, metin: str) -> str:
-        """Bilinen yerleri tespit eder."""
+        """Bilinen yerleri ve alias tabanlı özel mekanları tespit eder."""
         metin_lower = metin.lower()
+
+        for yer_adi, anahtarlar in self.OZEL_KONUM_IPUCLARI.items():
+            if any(anahtar in metin_lower for anahtar in anahtarlar):
+                return yer_adi
 
         for yer in self.BILINEN_YERLER:
             if yer.lower() in metin_lower:
@@ -320,15 +612,21 @@ class LocationExtractor:
 
         return None
 
+    def _spor_mekani_tespit_et(self, metin: str) -> str:
+        """Spor haberlerinde mekanı ilçe yerine daha güçlü bir aday olarak üret."""
+        metin_lower = metin.lower()
+        if "kocaelispor" not in metin_lower:
+            return None
+
+        if any(ipucu in metin_lower for ipucu in self.DEPLASMAN_IPUCLARI):
+            return None
+
+        # Kocaelispor haberleri, açık deplasman sinyali yoksa stadyumu ilçe adının önüne geçirir.
+        if any(ipucu in metin_lower for ipucu in self.KOCELI_STADYUMU_MAC_IPUCLARI):
+            return "Kocaeli Stadyumu"
+
+        return "Kocaeli Stadyumu"
+
     def _tum_konumlari_bul(self, metin: str) -> list:
-        """Metindeki tüm konum bilgilerini regex ile bulur."""
-        konumlar = []
-
-        for kalip in self.derli_kaliplar:
-            eslesmeler = kalip.finditer(metin)
-            for eslesme in eslesmeler:
-                konum = eslesme.group(0).strip()
-                if konum and konum not in konumlar:
-                    konumlar.append(konum)
-
-        return konumlar
+        """Geriye dönük uyumluluk için regex ile bulunan tüm konumları döndür."""
+        return [aday["tum_konumlar"][0] for aday in self._regex_adaylarini_topla(metin, None, None, None)]

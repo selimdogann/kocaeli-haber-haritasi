@@ -8,6 +8,7 @@ let map;
 let markers = [];
 let infoWindow;
 let haberler = [];
+const CAKISAN_MARKER_OFFSET = 0.00018;
 
 // ==================== HARİTA BAŞLATMA ====================
 // Google Maps API yüklendiğinde callback olarak çağrılır.
@@ -221,8 +222,11 @@ function markerIkonlariniHazirla() {
 async function haberleriGetir() {
     try {
         const params = filtreParametreleriOlustur();
+        params._ts = Date.now();
         const queryString = new URLSearchParams(params).toString();
-        const response = await fetch(`/api/haberler?${queryString}`);
+        const response = await fetch(`/api/haberler?${queryString}`, {
+            cache: 'no-store',
+        });
         const data = await response.json();
 
         if (data.basarili) {
@@ -240,7 +244,9 @@ async function haberleriGetir() {
 
 async function istatistikleriGetir() {
     try {
-        const response = await fetch('/api/istatistikler');
+        const response = await fetch(`/api/istatistikler?_ts=${Date.now()}`, {
+            cache: 'no-store',
+        });
         const data = await response.json();
         if (data.basarili) {
             const stats = data.istatistikler;
@@ -306,34 +312,100 @@ async function scrapingBaslat() {
 // ==================== HARİTA İŞLEMLERİ ====================
 
 function haberleriHaritayaEkle(haberListesi) {
-    haberListesi.forEach(haber => {
+    const gosterimKonumlari = cakisanMarkerKonumlariniHesapla(haberListesi);
+
+    haberListesi.forEach((haber, index) => {
         if (haber.koordinatlar && haber.koordinatlar.lat && haber.koordinatlar.lng) {
-            markerOlustur(haber);
+            const anahtar = haberKonumAnahtari(haber, index);
+            markerOlustur(haber, gosterimKonumlari.get(anahtar), anahtar);
         }
     });
 }
 
-function markerOlustur(haber) {
+function markerOlustur(haber, gosterimKonumu = null, haberAnahtari = null) {
     markerIkonlariniHazirla();
 
     const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
     const ikon = MARKER_ICONS[haber.haber_turu] || MARKER_ICONS['diger'];
+    const konum = gosterimKonumu || { lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng };
 
     const marker = new google.maps.Marker({
-        position: { lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng },
-        map: map,
+        position: konum,
+        map,
         icon: ikon,
         title: haber.baslik,
         animation: google.maps.Animation.DROP
     });
 
     marker.haberData = haber;
+    marker.haberKey = haberAnahtari;
 
     marker.addListener('click', () => {
         infoWindowAc(marker, haber);
     });
 
     markers.push(marker);
+}
+
+function haberKonumAnahtari(haber, index) {
+    return haber._id || haber.id || `${haber.baslik || 'haber'}-${index}`;
+}
+
+function koordinatGrupAnahtari(haber) {
+    return `${Number(haber.koordinatlar.lat).toFixed(6)}|${Number(haber.koordinatlar.lng).toFixed(6)}`;
+}
+
+function cakisanMarkerKonumlariniHesapla(haberListesi) {
+    const gruplar = new Map();
+    const dagitim = new Map();
+
+    haberListesi.forEach((haber, index) => {
+        if (!haber.koordinatlar || !haber.koordinatlar.lat || !haber.koordinatlar.lng) {
+            return;
+        }
+
+        const grupAnahtari = koordinatGrupAnahtari(haber);
+        if (!gruplar.has(grupAnahtari)) {
+            gruplar.set(grupAnahtari, []);
+        }
+
+        gruplar.get(grupAnahtari).push({
+            haber,
+            index,
+            anahtar: haberKonumAnahtari(haber, index),
+        });
+    });
+
+    gruplar.forEach((grup) => {
+        if (grup.length === 1) {
+            const tekil = grup[0];
+            dagitim.set(tekil.anahtar, {
+                lat: tekil.haber.koordinatlar.lat,
+                lng: tekil.haber.koordinatlar.lng,
+            });
+            return;
+        }
+
+        grup.sort((a, b) => {
+            const aDeger = `${a.haber.tarih || ''}|${a.haber.baslik || ''}|${a.anahtar}`;
+            const bDeger = `${b.haber.tarih || ''}|${b.haber.baslik || ''}|${b.anahtar}`;
+            return aDeger.localeCompare(bDeger, 'tr');
+        });
+
+        const merkezLat = grup[0].haber.koordinatlar.lat;
+        const merkezLng = grup[0].haber.koordinatlar.lng;
+        const yaricap = CAKISAN_MARKER_OFFSET + (Math.min(grup.length, 8) - 2) * 0.00002;
+
+        grup.forEach((kayit, sira) => {
+            const aci = (2 * Math.PI * sira) / grup.length;
+            dagitim.set(kayit.anahtar, {
+                lat: merkezLat + Math.sin(aci) * yaricap,
+                lng: merkezLng + Math.cos(aci) * yaricap,
+            });
+        });
+    });
+
+    return dagitim;
 }
 
 function infoWindowAc(marker, haber) {
@@ -456,9 +528,11 @@ function habereTikla(index) {
     const haber = haberler[index];
     if (!haber) return;
     if (haber.koordinatlar && haber.koordinatlar.lat && haber.koordinatlar.lng) {
-        map.panTo({ lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng });
+        const haberAnahtari = haberKonumAnahtari(haber, index);
+        const marker = markers.find(m => m.haberKey === haberAnahtari);
+        const hedefKonum = marker ? marker.getPosition() : { lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng };
+        map.panTo(hedefKonum);
         map.setZoom(14);
-        const marker = markers.find(m => m.haberData && m.haberData._id === haber._id);
         if (marker) {
             infoWindowAc(marker, haber);
             marker.setAnimation(google.maps.Animation.BOUNCE);

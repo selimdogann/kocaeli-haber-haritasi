@@ -42,7 +42,14 @@ def _haber_formatla(haber: dict) -> dict:
     """
     # Koordinat yapısı
     haber["koordinatlar"] = None
-    if haber.get("enlem") and haber.get("boylam"):
+    if haber.get("konum_geojson") and haber["konum_geojson"].get("coordinates"):
+        koordinatlar = haber["konum_geojson"]["coordinates"]
+        if len(koordinatlar) == 2:
+            haber["koordinatlar"] = {
+                "lat": koordinatlar[1],
+                "lng": koordinatlar[0],
+            }
+    elif haber.get("enlem") is not None and haber.get("boylam") is not None:
         haber["koordinatlar"] = {
             "lat": haber["enlem"],
             "lng": haber["boylam"],
