@@ -60,12 +60,14 @@ class MongoDB:
         self.news_collection.create_index("haber_turu")
         self.news_collection.create_index("yayin_tarihi")
         self.news_collection.create_index("kaynak_site")
+        self.news_collection.create_index([("konum_geojson", "2dsphere")])
         self.news_collection.create_index(
             [("yayin_tarihi", DESCENDING), ("haber_turu", 1)]
         )
 
         # Konum koleksiyonu indexleri - aynı konum için tekrar API çağrısı önlenir
         self.locations_collection.create_index("konum_metni", unique=True)
+        self.locations_collection.create_index([("konum_geojson", "2dsphere")])
 
         logger.info("Veritabanı indexleri oluşturuldu.")
 
@@ -85,6 +87,7 @@ class MongoDB:
             bool: Ekleme başarılı ise True, değilse False
         """
         try:
+            self._geojson_alanlarini_hazirla(haber_verisi)
             haber_verisi["olusturma_tarihi"] = datetime.now()
             haber_verisi["guncelleme_tarihi"] = datetime.now()
             self.news_collection.insert_one(haber_verisi)
@@ -111,6 +114,7 @@ class MongoDB:
             bool: Güncelleme başarılı ise True
         """
         try:
+            self._geojson_alanlarini_hazirla(guncelleme)
             guncelleme["guncelleme_tarihi"] = datetime.now()
             sonuc = self.news_collection.update_one(
                 {"haber_linki": haber_linki},
@@ -214,8 +218,7 @@ class MongoDB:
             filtre["yayin_tarihi"] = tarih_filtre
 
         # Sadece konumu olan haberleri getir (haritada göstermek için)
-        filtre["enlem"] = {"$exists": True, "$ne": None}
-        filtre["boylam"] = {"$exists": True, "$ne": None}
+        filtre["konum_geojson"] = {"$exists": True}
 
         return self.tum_haberleri_getir(filtre)
 
@@ -269,6 +272,7 @@ class MongoDB:
             bool: Kayıt başarılı ise True
         """
         try:
+            konum_geojson = self._geojson_nokta_olustur(enlem, boylam)
             self.locations_collection.update_one(
                 {"konum_metni": konum_metni},
                 {
@@ -276,6 +280,7 @@ class MongoDB:
                         "konum_metni": konum_metni,
                         "enlem": enlem,
                         "boylam": boylam,
+                        "konum_geojson": konum_geojson,
                         "guncelleme_tarihi": datetime.now(),
                     }
                 },
@@ -321,7 +326,7 @@ class MongoDB:
         try:
             toplam_haber = self.news_collection.count_documents({})
             konumlu_haber = self.news_collection.count_documents(
-                {"enlem": {"$exists": True, "$ne": None}}
+                {"konum_geojson": {"$exists": True}}
             )
 
             # Haber türlerine göre dağılım
@@ -361,3 +366,23 @@ class MongoDB:
         if self.client:
             self.client.close()
             logger.info("MongoDB bağlantısı kapatıldı.")
+
+    def _geojson_alanlarini_hazirla(self, veri: dict):
+        """Haber belgelerinde GeoJSON alanını enlem/boylam ile senkronize eder."""
+        if not isinstance(veri, dict):
+            return
+
+        enlem = veri.get("enlem")
+        boylam = veri.get("boylam")
+        if enlem is None or boylam is None:
+            return
+
+        veri["konum_geojson"] = self._geojson_nokta_olustur(enlem, boylam)
+
+    @staticmethod
+    def _geojson_nokta_olustur(enlem: float, boylam: float) -> dict:
+        """MongoDB 2dsphere uyumlu GeoJSON Point nesnesi döndürür."""
+        return {
+            "type": "Point",
+            "coordinates": [boylam, enlem],
+        }

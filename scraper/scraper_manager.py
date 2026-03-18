@@ -307,6 +307,10 @@ class ScraperManager:
             if geo_sonuc.get("basarili"):
                 haber["enlem"] = geo_sonuc["enlem"]
                 haber["boylam"] = geo_sonuc["boylam"]
+                haber["konum_geojson"] = {
+                    "type": "Point",
+                    "coordinates": [geo_sonuc["boylam"], geo_sonuc["enlem"]],
+                }
                 haber["formatli_adres"] = geo_sonuc.get("formatli_adres", "")
             else:
                 # Geocoding başarısız - sadece ilçe ile dene
@@ -317,12 +321,17 @@ class ScraperManager:
                     if geo_sonuc.get("basarili"):
                         haber["enlem"] = geo_sonuc["enlem"]
                         haber["boylam"] = geo_sonuc["boylam"]
+                        haber["konum_geojson"] = {
+                            "type": "Point",
+                            "coordinates": [geo_sonuc["boylam"], geo_sonuc["enlem"]],
+                        }
                         haber["formatli_adres"] = geo_sonuc.get("formatli_adres", "")
 
         # Konumu olmayanları da kaydet ama haritada gösterme
         if not haber.get("enlem"):
             haber["enlem"] = None
             haber["boylam"] = None
+            haber["konum_geojson"] = None
 
         # 7. Veritabanına kaydet
         if self.db:

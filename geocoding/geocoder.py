@@ -11,6 +11,7 @@ koordinatlarına dönüştürür. Google Geocoding API kullanır.
 """
 
 import logging
+import hashlib
 import googlemaps
 from config.settings import Config
 from database.mongodb import MongoDB
@@ -57,6 +58,35 @@ class Geocoder:
         "dilovası": {"enlem": 40.7833, "boylam": 29.5333},
         "kartepe": {"enlem": 40.6833, "boylam": 30.0500},
     }
+
+    # Sabit koordinatlı önemli yerler alias listeleriyle birlikte tanımlanır.
+    SABIT_KONUM_HARITASI = {
+        "Kocaeli Stadyumu": {
+            "aliaslar": [
+                "Kocaeli Stadı",
+                "Kocaeli Stadyumu",
+                "İzmit Kocaeli Stadı",
+                "Yıldız Entegre Kocaeli Stadyumu",
+                "İzmit Stadyumu",
+                "Kocaelispor",
+            ],
+            "enlem": 40.77104,
+            "boylam": 30.02036,
+            "formatli_adres": "Kocaeli Stadyumu, İzmit, Kocaeli",
+        },
+        "Brunga Tesisleri": {
+            "aliaslar": [
+                "Brunga Tesisleri",
+                "Körfez Brunga Tesisleri",
+            ],
+            "enlem": 40.76172,
+            "boylam": 29.78272,
+            "formatli_adres": "Brunga Tesisleri, Körfez, Kocaeli",
+        },
+    }
+
+    # Fallback işaretçileri küçük tutulur; doğruluk görsel dağılımdan daha önemlidir.
+    YEREL_FALLBACK_MAX_OFFSET = 0.00035
 
     def __init__(self):
         """Geocoder'ı başlatır."""
@@ -108,16 +138,19 @@ class Geocoder:
                 "kaynak": "cache",
             }
 
-        # 2. Yerel ilçe koordinatları ile fallback dene
-        yerel_sonuc = self._yerel_koordinat_bul(konum_metni)
-        if yerel_sonuc:
-            # Yerel sonucu da cache'e kaydet
-            self._cache_kaydet(konum_metni, yerel_sonuc["enlem"], yerel_sonuc["boylam"])
-            return yerel_sonuc
+        # 2. Sabit bilinen yer koordinatları
+        sabit_sonuc = self._bilinen_yer_koordinat_bul(konum_metni)
+        if sabit_sonuc:
+            self._cache_kaydet(konum_metni, sabit_sonuc["enlem"], sabit_sonuc["boylam"])
+            return sabit_sonuc
 
         # 3. API ile geocoding
         if not self.gmaps:
-            logger.warning("Google Maps API yapılandırılmamış!")
+            logger.warning("Google Maps API yapılandırılmamış, yerel fallback kullanılacak.")
+            yerel_sonuc = self._yerel_koordinat_bul(konum_metni)
+            if yerel_sonuc:
+                self._cache_kaydet(konum_metni, yerel_sonuc["enlem"], yerel_sonuc["boylam"])
+                return yerel_sonuc
             return {"basarili": False, "hata": "API yapılandırılmamış"}
 
         try:
@@ -142,7 +175,7 @@ class Geocoder:
             boylam = ilk_sonuc["geometry"]["location"]["lng"]
             formatli_adres = ilk_sonuc["formatted_address"]
 
-            # 3. Kocaeli sınırları kontrolü
+            # Gerçek API koordinatlarını aynen kullan, sadece doğrula.
             if not self._kocaeli_sinirlarinda_mi(enlem, boylam):
                 logger.warning(
                     f"Konum Kocaeli sınırları dışında: {konum_metni} "
@@ -170,9 +203,17 @@ class Geocoder:
 
         except googlemaps.exceptions.ApiError as e:
             logger.error(f"Geocoding API hatası: {e}")
+            yerel_sonuc = self._yerel_koordinat_bul(konum_metni)
+            if yerel_sonuc:
+                self._cache_kaydet(konum_metni, yerel_sonuc["enlem"], yerel_sonuc["boylam"])
+                return yerel_sonuc
             return {"basarili": False, "hata": f"API hatası: {e}"}
         except Exception as e:
             logger.error(f"Geocoding genel hata: {e}")
+            yerel_sonuc = self._yerel_koordinat_bul(konum_metni)
+            if yerel_sonuc:
+                self._cache_kaydet(konum_metni, yerel_sonuc["enlem"], yerel_sonuc["boylam"])
+                return yerel_sonuc
             return {"basarili": False, "hata": str(e)}
 
     def toplu_koordinat_bul(self, konum_listesi: list) -> list:
@@ -210,10 +251,17 @@ class Geocoder:
         for ilce_adi, koordinat in self.ILCE_KOORDINATLARI.items():
             # Sadece büyük harfli (orijinal) ilçe adlarını kontrol et
             if ilce_adi[0].isupper() and ilce_adi.lower() in metin_lower:
-                import random
-                # Küçük bir rastgele sapma ekle (aynı ilçedeki haberler üst üste binmesin)
-                enlem = koordinat["enlem"] + random.uniform(-0.008, 0.008)
-                boylam = koordinat["boylam"] + random.uniform(-0.008, 0.008)
+                enlem = koordinat["enlem"]
+                boylam = koordinat["boylam"]
+
+                # Fallback dağılımı çok küçük tutulur; ilçe merkezi esas kabul edilir.
+                if self.YEREL_FALLBACK_MAX_OFFSET > 0:
+                    enlem_offset, boylam_offset = self._deterministik_offset_uret(
+                        f"{ilce_adi}|{konum_metni}"
+                    )
+                    enlem += enlem_offset
+                    boylam += boylam_offset
+
                 logger.info(
                     f"Yerel koordinat bulundu: {konum_metni} -> {ilce_adi} ({enlem:.4f}, {boylam:.4f})"
                 )
@@ -225,6 +273,37 @@ class Geocoder:
                     "kaynak": "yerel",
                 }
         return None
+
+    def _bilinen_yer_koordinat_bul(self, konum_metni: str) -> dict:
+        """Sabit koordinatı bilinen landmark'ları doğrudan çözer."""
+        konum_lower = konum_metni.lower()
+        for yer_adi, tanim in self.SABIT_KONUM_HARITASI.items():
+            if any(alias.lower() in konum_lower for alias in tanim["aliaslar"]):
+                logger.info(
+                    f"Sabit koordinat bulundu: {konum_metni} -> {yer_adi} ({tanim['enlem']}, {tanim['boylam']})"
+                )
+                return {
+                    "enlem": tanim["enlem"],
+                    "boylam": tanim["boylam"],
+                    "formatli_adres": tanim["formatli_adres"],
+                    "basarili": True,
+                    "kaynak": "sabit",
+                }
+        return None
+
+    def _deterministik_offset_uret(self, anahtar: str) -> tuple[float, float]:
+        """Aynı anahtar için sabit küçük offset üretir."""
+        digest = hashlib.sha256(anahtar.encode("utf-8")).digest()
+        lat_seed = int.from_bytes(digest[:8], "big")
+        lng_seed = int.from_bytes(digest[8:16], "big")
+
+        max_offset = self.YEREL_FALLBACK_MAX_OFFSET
+        if max_offset <= 0:
+            return 0.0, 0.0
+
+        enlem_offset = ((lat_seed / float(2**64 - 1)) * 2 - 1) * max_offset
+        boylam_offset = ((lng_seed / float(2**64 - 1)) * 2 - 1) * max_offset
+        return enlem_offset, boylam_offset
 
     def _kocaeli_sinirlarinda_mi(self, enlem: float, boylam: float) -> bool:
         """
