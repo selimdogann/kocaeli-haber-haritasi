@@ -31,6 +31,13 @@ class Config:
     SCRAPER_MAX_WORKERS = int(os.getenv("SCRAPER_MAX_WORKERS", 8))
     SCRAPER_MAX_LINKS_PER_SOURCE = int(os.getenv("SCRAPER_MAX_LINKS_PER_SOURCE", 50))
 
+    # Konum çıkarımı ayarları
+    LOCATION_NER_ENABLED = os.getenv("LOCATION_NER_ENABLED", "True").lower() == "true"
+    LOCATION_NER_MODEL = os.getenv(
+        "LOCATION_NER_MODEL",
+        "Babelscape/wikineural-multilingual-ner",
+    )
+
     # Kocaeli Merkez Koordinatları (Harita başlangıç noktası)
     KOCAELI_CENTER_LAT = 40.7654
     KOCAELI_CENTER_LNG = 29.9408
