@@ -281,11 +281,13 @@ class BaseScraper(ABC):
                 try:
                     haber = self.haber_detay_getir(link)
                     if haber and haber.get("baslik"):
-                        # Son N gün kontrolü - tarihi yoksa haberi yine de dahil et
-                        if haber.get("yayin_tarihi"):
-                            if not self.son_n_gun_icinde_mi(haber["yayin_tarihi"]):
-                                return None
-                        # Tarih yoksa güncel kabul et (yakın zamanlı haber olma ihtimali yüksek)
+                        # Tarihi olan haberlerde son N gün kuralını uygula.
+                        if haber.get("yayin_tarihi") and not self.son_n_gun_icinde_mi(
+                            haber["yayin_tarihi"]
+                        ):
+                            return None
+
+                        # Tarihi çözülemeyen haberler yine alınır; bazı siteler tarih alanını eksik veriyor.
 
                         haber["kaynak_site"] = self.kaynak_adi
                         haber["haber_linki"] = link

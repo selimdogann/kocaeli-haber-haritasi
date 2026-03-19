@@ -216,6 +216,14 @@ class MongoDB:
                     bitis_tarihi, "%Y-%m-%d"
                 ) + timedelta(days=1)
             filtre["yayin_tarihi"] = tarih_filtre
+        else:
+            # Varsayılan görünüm: son N gün içindeki tarihli haberler + tarihi bulunamayanlar.
+            varsayilan_baslangic = datetime.now() - timedelta(days=Config.SCRAPING_DAYS)
+            filtre["$or"] = [
+                {"yayin_tarihi": {"$gte": varsayilan_baslangic}},
+                {"yayin_tarihi": {"$exists": False}},
+                {"yayin_tarihi": None},
+            ]
 
         # Sadece konumu olan haberleri getir (haritada göstermek için)
         filtre["konum_geojson"] = {"$exists": True}
