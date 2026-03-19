@@ -244,7 +244,10 @@ async function haberleriGetir() {
 
 async function istatistikleriGetir() {
     try {
-        const response = await fetch(`/api/istatistikler?_ts=${Date.now()}`, {
+        const params = filtreParametreleriOlustur();
+        params._ts = Date.now();
+        const queryString = new URLSearchParams(params).toString();
+        const response = await fetch(`/api/istatistikler?${queryString}`, {
             cache: 'no-store',
         });
         const data = await response.json();

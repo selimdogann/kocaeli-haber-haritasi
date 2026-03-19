@@ -192,42 +192,13 @@ class MongoDB:
         Returns:
             list: Filtrelenmiş haber listesi
         """
-        filtre = {}
-
-        if haber_turu:
-            # Virgülle ayrılmış birden fazla tür desteği
-            turler = [t.strip() for t in haber_turu.split(",") if t.strip()]
-            if len(turler) == 1:
-                filtre["haber_turu"] = turler[0]
-            elif len(turler) > 1:
-                filtre["haber_turu"] = {"$in": turler}
-
-        if ilce:
-            filtre["ilce"] = {"$regex": ilce, "$options": "i"}
-
-        if baslangic_tarihi or bitis_tarihi:
-            tarih_filtre = {}
-            if baslangic_tarihi:
-                tarih_filtre["$gte"] = datetime.strptime(
-                    baslangic_tarihi, "%Y-%m-%d"
-                )
-            if bitis_tarihi:
-                tarih_filtre["$lte"] = datetime.strptime(
-                    bitis_tarihi, "%Y-%m-%d"
-                ) + timedelta(days=1)
-            filtre["yayin_tarihi"] = tarih_filtre
-        else:
-            # Varsayılan görünüm: son N gün içindeki tarihli haberler + tarihi bulunamayanlar.
-            varsayilan_baslangic = datetime.now() - timedelta(days=Config.SCRAPING_DAYS)
-            filtre["$or"] = [
-                {"yayin_tarihi": {"$gte": varsayilan_baslangic}},
-                {"yayin_tarihi": {"$exists": False}},
-                {"yayin_tarihi": None},
-            ]
-
-        # Sadece konumu olan haberleri getir (haritada göstermek için)
-        filtre["konum_geojson"] = {"$exists": True}
-
+        filtre = self._haber_filtresi_olustur(
+            haber_turu=haber_turu,
+            ilce=ilce,
+            baslangic_tarihi=baslangic_tarihi,
+            bitis_tarihi=bitis_tarihi,
+            sadece_konumlu=True,
+        )
         return self.tum_haberleri_getir(filtre)
 
     def haber_linki_var_mi(self, haber_linki: str) -> bool:
@@ -324,7 +295,13 @@ class MongoDB:
     # İSTATİSTİK İŞLEMLERİ
     # ==========================================
 
-    def istatistikleri_getir(self) -> dict:
+    def istatistikleri_getir(
+        self,
+        haber_turu: str = None,
+        ilce: str = None,
+        baslangic_tarihi: str = None,
+        bitis_tarihi: str = None,
+    ) -> dict:
         """
         Genel istatistikleri döndürür.
 
@@ -332,16 +309,28 @@ class MongoDB:
             dict: İstatistik bilgileri
         """
         try:
-            toplam_haber = self.news_collection.count_documents({})
-            konumlu_haber = self.news_collection.count_documents(
-                {"konum_geojson": {"$exists": True}}
+            temel_filtre = self._haber_filtresi_olustur(
+                haber_turu=haber_turu,
+                ilce=ilce,
+                baslangic_tarihi=baslangic_tarihi,
+                bitis_tarihi=bitis_tarihi,
+                sadece_konumlu=False,
             )
+            konumlu_filtre = self._haber_filtresi_olustur(
+                haber_turu=haber_turu,
+                ilce=ilce,
+                baslangic_tarihi=baslangic_tarihi,
+                bitis_tarihi=bitis_tarihi,
+                sadece_konumlu=True,
+            )
+            toplam_haber = self.news_collection.count_documents(temel_filtre)
+            konumlu_haber = self.news_collection.count_documents(konumlu_filtre)
 
             # Haber türlerine göre dağılım
             tur_dagilimi = {}
             for tur in Config.NEWS_TYPES:
                 tur_dagilimi[tur] = self.news_collection.count_documents(
-                    {"haber_turu": tur}
+                    {**konumlu_filtre, "haber_turu": tur}
                 )
 
             # Kaynak sitelere göre dağılım
@@ -362,6 +351,51 @@ class MongoDB:
         except Exception as e:
             logger.error(f"İstatistik getirme hatası: {e}")
             return {}
+
+    def _haber_filtresi_olustur(
+        self,
+        haber_turu: str = None,
+        ilce: str = None,
+        baslangic_tarihi: str = None,
+        bitis_tarihi: str = None,
+        sadece_konumlu: bool = True,
+    ) -> dict:
+        """Liste ve istatistik sorgularında ortak filtre mantığını üretir."""
+        filtre = {}
+
+        if haber_turu:
+            turler = [t.strip() for t in haber_turu.split(",") if t.strip()]
+            if len(turler) == 1:
+                filtre["haber_turu"] = turler[0]
+            elif len(turler) > 1:
+                filtre["haber_turu"] = {"$in": turler}
+
+        if ilce:
+            filtre["ilce"] = {"$regex": ilce, "$options": "i"}
+
+        if baslangic_tarihi or bitis_tarihi:
+            tarih_filtre = {}
+            if baslangic_tarihi:
+                tarih_filtre["$gte"] = datetime.strptime(
+                    baslangic_tarihi, "%Y-%m-%d"
+                )
+            if bitis_tarihi:
+                tarih_filtre["$lte"] = datetime.strptime(
+                    bitis_tarihi, "%Y-%m-%d"
+                ) + timedelta(days=1)
+            filtre["yayin_tarihi"] = tarih_filtre
+        else:
+            varsayilan_baslangic = datetime.now() - timedelta(days=Config.SCRAPING_DAYS)
+            filtre["$or"] = [
+                {"yayin_tarihi": {"$gte": varsayilan_baslangic}},
+                {"yayin_tarihi": {"$exists": False}},
+                {"yayin_tarihi": None},
+            ]
+
+        if sadece_konumlu:
+            filtre["konum_geojson"] = {"$exists": True}
+
+        return filtre
 
     def veritabanini_temizle(self):
         """Tüm verileri siler (geliştirme amaçlı)."""
