@@ -215,7 +215,12 @@ def istatistikleri_getir():
         if not db:
             return jsonify({"hata": "Veritabanı bağlantı hatası"}), 500
 
-        istatistikler = db.istatistikleri_getir()
+        istatistikler = db.istatistikleri_getir(
+            haber_turu=request.args.get("haber_turu"),
+            ilce=request.args.get("ilce"),
+            baslangic_tarihi=request.args.get("baslangic_tarihi"),
+            bitis_tarihi=request.args.get("bitis_tarihi"),
+        )
 
         return jsonify({
             "basarili": True,
