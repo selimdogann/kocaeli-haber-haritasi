@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 class SesKocaeliScraper(BaseScraper):
     """Ses Kocaeli haber sitesi scraper'ı (Daktilo CMS)."""
 
+    CLOUDFLARE_KORUMALI = True
+
     def __init__(self):
         super().__init__(
             kaynak_adi="Ses Kocaeli",

@@ -21,6 +21,7 @@ class YeniKocaeliScraper(BaseScraper):
             kaynak_adi="Yeni Kocaeli",
             base_url="https://www.yenikocaeli.com",
         )
+        self.timeout = 5  # Bu site sık timeout veriyor, kısa tut
         # Gerçek kategori sayfaları (footer'dan alındı)
         self.kategori_urls = [
             f"{self.base_url}/haber/guncel.html",
