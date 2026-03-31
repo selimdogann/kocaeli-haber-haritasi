@@ -6,29 +6,16 @@ Haber içeriklerini analiz ederek anahtar kelime tabanlı
 sınıflandırma yapar. Her haber yalnızca bir türle etiketlenir.
 
 
-Haber Türleri:
+Haber Türleri (PDF zorunlu 5 tür):
 1. Trafik Kazası
 2. Yangın
 3. Elektrik Kesintisi
-4. Afet ve Acil Durum
-5. Hırsızlık
-6. Vefat
-7. Sağlık
-8. Eğitim
-9. Spor
-10. Yerel Yönetim
-11. Toplumsal Gündem
-12. Ekonomi
-13. Kamu Duyurusu
-14. Medya ve Magazin
-15. Kültürel Etkinlikler
+4. Hırsızlık
+5. Kültürel Etkinlikler
 
 
 Öncelik Sırası (birden fazla kategoriye giriyorsa):
-Yangın > Trafik Kazası > Elektrik Kesintisi > Afet ve Acil Durum >
-Hırsızlık > Vefat > Sağlık > Eğitim > Spor > Yerel Yönetim >
-Toplumsal Gündem > Ekonomi > Kamu Duyurusu > Medya ve Magazin >
-Kültürel Etkinlikler
+Trafik Kazası > Yangın > Elektrik Kesintisi > Hırsızlık > Kültürel Etkinlikler
 """
 
 
@@ -46,7 +33,7 @@ class NewsClassifier:
 
 
    TRAFIK_MIN_ESLESME = 2
-   MIN_GUVEN_ESIGI = 0.5
+   MIN_GUVEN_ESIGI = 0.3
    TRAFIK_KAZA_KELIMELERI = [
        "kaza",
        "trafik kazası",
@@ -77,24 +64,11 @@ class NewsClassifier:
    ]
 
 
-   # Haber türleri ve anahtar kelimeleri
+   # Haber türleri ve anahtar kelimeleri (PDF zorunlu 5 tür)
    # Her kategorinin bir ağırlık/öncelik değeri vardır (düşük = yüksek öncelik)
    SINIFLANDIRMA_KURALLARI = {
-       "yangin": {
-           "oncelik": 1,
-           "anahtar_kelimeler": [
-               "yangın", "yangin", "yandı", "yanıyor", "tutuştu",
-               "alevler", "alev aldı", "alev", "itfaiye", "söndürme",
-               "söndürüldü", "dumanlı", "duman", "küle döndü", "kül oldu",
-               "yangın çıktı", "kundaklama", "kundak", "yanarak",
-               "yangın ihbarı", "yangında", "yanmış",
-           ],
-           "guclu_anahtar_kelimeler": [
-               "yangın", "itfaiye", "alev aldı", "söndürme",
-           ],
-       },
        "trafik_kazasi": {
-           "oncelik": 2,
+           "oncelik": 1,
            "anahtar_kelimeler": [
                "trafik kazası",
                "feci kaza",
@@ -129,32 +103,17 @@ class NewsClassifier:
                "altında kalan",
             ],
         },
-       "afet_acil_durum": {
-           "oncelik": 4,
+       "yangin": {
+           "oncelik": 2,
            "anahtar_kelimeler": [
-               "deprem", "sarsıntı", "artçı", "afad", "kandilli",
-               "meteoroloji", "uyarı", "kar yağışı", "sağanak", "yıldırım",
-               "fırtına", "firtina", "sel", "heyelan", "don uyarısı",
-               "çığ", "cig", "sis", "buzlanma",
+               "yangın", "yangin", "yandı", "yanıyor", "tutuştu",
+               "alevler", "alev aldı", "alev", "itfaiye", "söndürme",
+               "söndürüldü", "dumanlı", "duman", "küle döndü", "kül oldu",
+               "yangın çıktı", "kundaklama", "kundak", "yanarak",
+               "yangın ihbarı", "yangında", "yanmış",
            ],
            "guclu_anahtar_kelimeler": [
-               "deprem", "afad", "meteoroloji", "fırtına", "sel",
-           ],
-       },
-       "hirsizlik": {
-           "oncelik": 5,
-           "anahtar_kelimeler": [
-               "hırsızlık", "hırsız", "çalındı", "çaldı", "çalınan",
-               "soygun", "soyuldu", "gasp", "gaspçı", "dolandırıcılık",
-               "dolandırıcı", "kapkaç", "kapkaççı", "suçlu", "suçlular",
-               "yakalandı", "gözaltı", "tutuklama", "tutuklandı",
-               "polis", "jandarma", "operasyon", "baskın",
-               "şüpheli", "şüpheliler", "hapis",
-               "emniyet", "asayiş", "suç", "silahlı",
-               "cinayet", "mühürlendi", "kaçak üretim", "denetim",
-           ],
-           "guclu_anahtar_kelimeler": [
-               "hırsızlık", "hırsız", "soygun", "gasp", "kapkaç", "cinayet",
+               "yangın", "itfaiye", "alev aldı", "söndürme",
            ],
        },
        "elektrik_kesintisi": {
@@ -173,8 +132,24 @@ class NewsClassifier:
                "enerji kesintisi", "planlı kesinti", "sedaş",
            ],
        },
+       "hirsizlik": {
+           "oncelik": 4,
+           "anahtar_kelimeler": [
+               "hırsızlık", "hırsız", "çalındı", "çaldı", "çalınan",
+               "soygun", "soyuldu", "gasp", "gaspçı", "dolandırıcılık",
+               "dolandırıcı", "kapkaç", "kapkaççı",
+               "cinayet", "silahlı saldırı", "bıçaklı saldırı",
+               "kaçak üretim", "uyuşturucu",
+               "hırsızlık şüphelisi", "hırsızlık olayı",
+               "eve girdi", "iş yerine girdi", "dükkana girdi",
+           ],
+           "guclu_anahtar_kelimeler": [
+               "hırsızlık", "hırsız", "soygun", "gasp", "kapkaç",
+               "cinayet", "dolandırıcılık", "uyuşturucu",
+           ],
+       },
        "kulturel_etkinlik": {
-           "oncelik": 15,
+           "oncelik": 5,
            "anahtar_kelimeler": [
                "etkinlik", "konser", "sergi", "tiyatro", "festival",
                "gösteri", "sahne", "sanat", "kültür", "müzik",
@@ -182,152 +157,14 @@ class NewsClassifier:
                "panel", "seminer", "workshop", "atölye", "fuar",
                "kermes", "şenlik", "kutlama", "anma", "açılış",
                "ödül", "yarışma",
-               "müze", "kütüphane", "gala", "performans", "iftar",
-               "buluşma", "program", "vakfı", "dernek",
+               "müze", "kütüphane", "gala", "performans",
+               "buluşma", "program",
                "resital", "orkestra", "koro", "halk oyunları",
            ],
            "guclu_anahtar_kelimeler": [
                "konser", "sergi", "tiyatro", "festival", "etkinlik",
                "gösteri", "şenlik",
            ],
-       },
-       "vefat": {
-           "oncelik": 6,
-           "anahtar_kelimeler": [
-               "vefat etti",
-               "hayatını kaybetti",
-               "yaşamını yitirdi",
-               "son yolculuğuna uğurlandı",
-               "hayata gözlerini yumdu",
-               "son yolculuğuna",
-               "cenaze",
-               "cenazeye",
-               "cenazesi",
-               "öldü",
-               "ölü",
-               "kalp krizi",
-            ],
-           "guclu_anahtar_kelimeler": [
-               "vefat etti",
-               "hayatını kaybetti",
-               "yaşamını yitirdi",
-               "son yolculuğuna uğurlandı",
-               "kalp krizi",
-            ],
-       },
-       "saglik": {
-           "oncelik": 7,
-           "anahtar_kelimeler": [
-               "sağlık", "saglik", "hastane", "doktor", "hekim",
-               "hasta", "tedavi", "muayene", "ameliyat", "operasyon",
-               "virüs", "virus", "enfeksiyon", "salgın", "aşı",
-               "poliklinik", "acil servis", "yoğun bakım", "ambulans",
-               "sağlık çalışanı", "entübe", "tıp fakültesi", "tıp bayramı",
-            ],
-           "guclu_anahtar_kelimeler": [
-               "hastane", "ameliyat", "yoğun bakım", "aşı", "virüs",
-           ],
-       },
-       "egitim": {
-           "oncelik": 8,
-           "anahtar_kelimeler": [
-               "okul", "öğrenci", "ogrenci", "öğretmen", "ogretmen",
-               "eğitim", "egitim", "üniversite", "universite", "sınav",
-               "sinav", "ders", "akademik", "mezuniyet", "karne",
-               "burs", "yurt", "kampüs", "kampus", "müdür", "mudur",
-               "koü", "eğitim öğretim", "ara tatil",
-            ],
-           "guclu_anahtar_kelimeler": [
-               "okul", "öğrenci", "öğretmen", "üniversite", "sınav",
-           ],
-       },
-       "spor": {
-           "oncelik": 9,
-           "anahtar_kelimeler": [
-               "spor", "maç", "mac", "futbol", "basketbol", "voleybol",
-               "gol", "puan", "lig", "takım", "takim", "kulüp", "kulup",
-               "taraftar", "antrenör", "antrenman", "teknik direktör",
-               "transfer", "şampiyona", "turnuva", "kocaelispor",
-               "galatasaray", "stadyum", "hakem", "var hakemi",
-               "penaltı", "kırmızı kart", "galibiyet", "mağlup",
-               "u19", "u18", "u17", "u16", "rekabet",
-               "kağıtspor", "kagitspor", "yeşil-siyahlı",
-               "belediyespor", "play-off", "müsabaka", "temsilcisi",
-           ],
-           "guclu_anahtar_kelimeler": [
-               "maç", "futbol", "basketbol", "voleybol", "transfer",
-               "kocaelispor", "galibiyet", "kağıtspor",
-               "belediyespor", "şampiyona", "play-off",
-           ],
-       },
-       "yerel_yonetim": {
-           "oncelik": 10,
-           "anahtar_kelimeler": [
-               "belediye", "büyükşehir", "buyuksehir", "başkan", "baskan",
-               "meclis", "encümen", "encumen", "muhtar", "valilik",
-               "kaymakamlık", "kaymakamlik", "altyapı", "altyapi",
-               "yol çalışması", "asfalt", "ihale", "proje", "duyuru",
-               "açılış", "hizmet binası", "park", "ulaşım", "ulasim",
-               "vali", "kaymakam", "dsi", "genel müdürlüğü", "vatandaş buluşması",
-            ],
-           "guclu_anahtar_kelimeler": [
-               "belediye", "büyükşehir", "meclis", "altyapı", "ihale",
-           ],
-       },
-       "toplumsal_gundem": {
-           "oncelik": 11,
-           "anahtar_kelimeler": [
-               "cumhurbaşkanı", "cumhurbaskani", "erdoğan", "erdogan",
-               "iftar", "sofra", "buluştu", "buluşma", "mesaj",
-               "teşkilat", "teskilat", "vakfı", "vakfi", "gaziler",
-               "şehit yakınları", "engelli", "cami", "imam", "vatandaş",
-               "vatandas", "dertlerini dinledi", "anlamlı etkinlik",
-           ],
-           "guclu_anahtar_kelimeler": [
-               "cumhurbaşkanı", "iftar", "buluştu", "imam", "vatandaş",
-           ],
-       },
-       "ekonomi": {
-           "oncelik": 12,
-           "anahtar_kelimeler": [
-               "ekonomi", "zam", "fiyat", "indirim", "maaş",
-               "maas", "emekli", "ikramiye", "ödeme", "odeme", "işçi alımı",
-               "isci alimi", "iş ilanı", "istihdam", "fabrika", "sanayi",
-               "üretim", "uretim", "ihracat", "yatırım", "yatirim", "işkur",
-               "işçi alacak", "personel alımı", "personel alacak",
-               "işe alım", "alım yapacak",
-           ],
-           "guclu_anahtar_kelimeler": [
-               "emekli", "ikramiye", "işçi alımı", "istihdam", "işkur",
-               "işçi alacak", "personel alımı",
-           ],
-       },
-       "kamu_duyurusu": {
-           "oncelik": 13,
-           "anahtar_kelimeler": [
-               "nöbetçi eczane", "nobetci eczane", "eczane", "nöbetçi noter",
-               "nobetci noter", "noter", "duyuru", "liste", "adresleri",
-               "yayın akışı", "yayin akisi",
-           ],
-           "guclu_anahtar_kelimeler": [
-               "nöbetçi eczane", "nöbetçi noter", "yayın akışı",
-           ],
-       },
-       "medya_magazin": {
-           "oncelik": 14,
-           "anahtar_kelimeler": [
-               "dizi", "televizyon", "tv", "atv", "yayın", "canlı yayında",
-               "kitap", "baskısı", "sanatçı", "oyuncu", "program",
-               "izleyici", "magazin", "ünlü", "unlu",
-           ],
-           "guclu_anahtar_kelimeler": [
-               "dizi", "yayın akışı", "canlı yayında", "kitap",
-           ],
-       },
-       "diger": {
-           "oncelik": 999,
-           "anahtar_kelimeler": [],
-           "guclu_anahtar_kelimeler": [],
        },
    }
 
@@ -443,17 +280,6 @@ class NewsClassifier:
        if not (kaza_var and arac_var):
            skorlar["trafik_kazasi"] = 0
 
-       vefat_guclu_var = any(
-           kalip.search(birlesik_metin)
-           for kalip in self.derli_kaliplar["vefat"]["guclu"]
-       )
-       if vefat_guclu_var:
-           # Vefat haberlerinde meslek/bağlam kelimeleri sinyali bozmasın.
-           skorlar["saglik"] = 0
-           skorlar["egitim"] = 0
-           skorlar["ekonomi"] = 0
-           skorlar["spor"] = 0
-
 
        # En yüksek skorlu türü bul
        if not skorlar or max(skorlar.values()) == 0:
@@ -487,7 +313,7 @@ class NewsClassifier:
 
 
        if guven_skoru < self.MIN_GUVEN_ESIGI:
-           secilen_tur = "diger"
+           secilen_tur = None
 
 
        return {
@@ -507,7 +333,7 @@ class NewsClassifier:
 
 
        Returns:
-           list: Her haberin sınıflandırma sonucuu
+           list: Her haberin sınıflandırma sonucu
        """
        sonuclar = []
        for haber in haberler:
