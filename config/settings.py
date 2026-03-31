@@ -21,15 +21,19 @@ class Config:
 
     # Flask Ayarları
     FLASK_ENV = os.getenv("FLASK_ENV", "development")
-    FLASK_DEBUG = os.getenv("FLASK_DEBUG", "True").lower() == "true"
+    FLASK_DEBUG = os.getenv("FLASK_DEBUG", "False").lower() == "true"
     FLASK_PORT = int(os.getenv("FLASK_PORT", 5001))
+
+    # Admin API Anahtarı (/api/temizle koruması)
+    ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
     # Scraping Ayarları
     SCRAPING_DAYS = int(os.getenv("SCRAPING_DAYS", 3))
-    REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", 30))
-    REQUEST_DELAY = float(os.getenv("REQUEST_DELAY", 0.3))
-    SCRAPER_MAX_WORKERS = int(os.getenv("SCRAPER_MAX_WORKERS", 8))
+    REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", 20))
+    REQUEST_DELAY = float(os.getenv("REQUEST_DELAY", 0.1))
+    SCRAPER_MAX_WORKERS = int(os.getenv("SCRAPER_MAX_WORKERS", 12))
     SCRAPER_MAX_LINKS_PER_SOURCE = int(os.getenv("SCRAPER_MAX_LINKS_PER_SOURCE", 50))
+    PROCESSING_MAX_WORKERS = int(os.getenv("PROCESSING_MAX_WORKERS", 5))
 
     # Konum çıkarımı ayarları
     LOCATION_NER_ENABLED = os.getenv("LOCATION_NER_ENABLED", "True").lower() == "true"
@@ -66,7 +70,7 @@ class Config:
         },
     }
 
-    # Haber Türleri ve Renkleri
+    # Haber Türleri ve Renkleri (PDF zorunlu 5 tür)
     NEWS_TYPES = {
         "trafik_kazasi": {
             "label": "Trafik Kazası",
@@ -86,83 +90,17 @@ class Config:
             "icon": "⚡",
             "marker_color": "yellow",
         },
-        "afet_acil_durum": {
-            "label": "Afet ve Acil Durum",
-            "color": "#B91C1C",
-            "icon": "🌪️",
-            "marker_color": "darkred",
-        },
         "hirsizlik": {
             "label": "Hırsızlık",
             "color": "#7C3AED",
             "icon": "🔒",
             "marker_color": "purple",
         },
-        "vefat": {
-            "label": "Vefat",
-            "color": "#475569",
-            "icon": "🕊️",
-            "marker_color": "slate",
-        },
-        "saglik": {
-            "label": "Sağlık",
-            "color": "#059669",
-            "icon": "🩺",
-            "marker_color": "green",
-        },
-        "egitim": {
-            "label": "Eğitim",
-            "color": "#0F766E",
-            "icon": "🎓",
-            "marker_color": "teal",
-        },
-        "spor": {
-            "label": "Spor",
-            "color": "#16A34A",
-            "icon": "⚽",
-            "marker_color": "green",
-        },
-        "yerel_yonetim": {
-            "label": "Yerel Yönetim",
-            "color": "#8B5CF6",
-            "icon": "🏛️",
-            "marker_color": "violet",
-        },
-        "toplumsal_gundem": {
-            "label": "Toplumsal Gündem",
-            "color": "#C2410C",
-            "icon": "🤝",
-            "marker_color": "amber",
-        },
-        "ekonomi": {
-            "label": "Ekonomi",
-            "color": "#CA8A04",
-            "icon": "💼",
-            "marker_color": "gold",
-        },
-        "kamu_duyurusu": {
-            "label": "Kamu Duyurusu",
-            "color": "#0EA5E9",
-            "icon": "📢",
-            "marker_color": "sky",
-        },
-        "medya_magazin": {
-            "label": "Medya ve Magazin",
-            "color": "#DB2777",
-            "icon": "🎬",
-            "marker_color": "pink",
-        },
         "kulturel_etkinlik": {
             "label": "Kültürel Etkinlikler",
             "color": "#2563EB",
             "icon": "🎭",
             "marker_color": "blue",
-        },
-        "diger": {
-            "label": "Diğer",
-            "color": "#6B7280",
-            "icon": "📰",
-            "marker_color": "gray",
         },
     }
 
