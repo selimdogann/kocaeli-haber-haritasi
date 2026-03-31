@@ -87,13 +87,9 @@ function markerIkonlariniHazirla() {
                 <path d="M0,-3 C0,-3 -2.8,0 -2.8,2 C-2.8,3.5 -1.5,4.8 0,4.8 C1.5,4.8 2.8,3.5 2.8,2 C2.8,0 0,-3 0,-3Z" fill="#EA580C" opacity="0.5"/>
             </g>`),
 
-        // Afet ve Acil Durum — koyu kirmizi badge, beyaz uyari
-        afet_acil_durum: pinSvgOlustur('#B91C1C',
-            `<g fill="#fff" transform="translate(20,18)">
-                <path d="M0,-8 L8,7 H-8 Z"/>
-                <rect x="-1.2" y="-3.5" width="2.4" height="6" rx="1" fill="#B91C1C"/>
-                <circle cx="0" cy="4.5" r="1.4" fill="#B91C1C"/>
-            </g>`),
+        // Elektrik Kesintisi — koyu badge, sarı şimşek
+        elektrik_kesintisi: pinSvgOlustur('#1e293b',
+            `<polygon points="22,8 16,17.5 19,17.5 16,26 24,15.5 20.5,15.5 22.5,8" fill="#FACC15"/>`),
 
         // Hırsızlık — mor badge, beyaz gözlük/maske ikonu
         hirsizlik: pinSvgOlustur('#7C3AED',
@@ -106,87 +102,6 @@ function markerIkonlariniHazirla() {
                 <path d="M-5,4 C-5,4 -2.5,7 0,7 C2.5,7 5,4 5,4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
             </g>`),
 
-        // Vefat — koyu gri badge, beyaz güvercin
-        vefat: pinSvgOlustur('#475569',
-            `<g fill="#fff" transform="translate(20,18)">
-                <path d="M-5,2 C-3,-4 1,-6 5,-4 C3,-2 2,0 3,3 C1,4 -2,5 -5,2Z"/>
-                <path d="M-1,-1 L5,-6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-                <circle cx="4.8" cy="-6.2" r="1.2"/>
-            </g>`),
-
-        // Sağlık — yeşil badge, beyaz sağlık artısı
-        saglik: pinSvgOlustur('#059669',
-            `<g fill="#fff" transform="translate(20,18)">
-                <rect x="-2" y="-7" width="4" height="14" rx="1"/>
-                <rect x="-7" y="-2" width="14" height="4" rx="1"/>
-            </g>`),
-
-        // Eğitim — teal badge, beyaz kep
-        egitim: pinSvgOlustur('#0F766E',
-            `<g fill="#fff" transform="translate(20,18)">
-                <polygon points="0,-7 9,-3 0,1 -9,-3"/>
-                <rect x="-1.5" y="1" width="3" height="6" rx="1"/>
-                <path d="M5,-1 L8,1.5 L8,6" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-            </g>`),
-
-        // Spor — yeşil badge, beyaz top
-        spor: pinSvgOlustur('#16A34A',
-            `<g fill="none" stroke="#fff" stroke-width="1.5" transform="translate(20,18)">
-                <circle cx="0" cy="0" r="7" fill="none"/>
-                <polygon points="0,-3 -2,0 0,3 2,0" fill="#fff" stroke="none"/>
-                <path d="M-6,-1 C-4,-2 -3,-4 -2,-6"/>
-                <path d="M6,-1 C4,-2 3,-4 2,-6"/>
-                <path d="M-5,4 C-3,3 -1,3 0,5"/>
-                <path d="M5,4 C3,3 1,3 0,5"/>
-            </g>`),
-
-        // Yerel Yönetim — mor-mavi badge, beyaz bina
-        yerel_yonetim: pinSvgOlustur('#8B5CF6',
-            `<g fill="#fff" transform="translate(20,18)">
-                <polygon points="0,-8 8,-4.5 -8,-4.5"/>
-                <rect x="-7" y="-3.5" width="14" height="2"/>
-                <rect x="-6.5" y="-1.5" width="2.2" height="8"/>
-                <rect x="-1.1" y="-1.5" width="2.2" height="8"/>
-                <rect x="4.3" y="-1.5" width="2.2" height="8"/>
-                <rect x="-8" y="6.5" width="16" height="2"/>
-            </g>`),
-
-        // Toplumsal Gündem — amber badge, beyaz tokalasma
-        toplumsal_gundem: pinSvgOlustur('#C2410C',
-            `<g fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="translate(20,18)">
-                <path d="M-7,-1 L-3,-1 L-1,2 L2,2 L4,-1 L7,-1"/>
-                <path d="M-4,-1 L-6,3 L-3,5 L-1,2"/>
-                <path d="M4,-1 L6,3 L3,5 L1,2"/>
-            </g>`),
-
-        // Ekonomi — altin badge, beyaz canta
-        ekonomi: pinSvgOlustur('#CA8A04',
-            `<g fill="#fff" transform="translate(20,18)">
-                <rect x="-7" y="-3" width="14" height="10" rx="2"/>
-                <path d="M-3,-3 V-5 C-3,-6.2 -2.2,-7 -1,-7 H1 C2.2,-7 3,-6.2 3,-5 V-3" fill="none" stroke="#fff" stroke-width="1.7"/>
-                <rect x="-1.6" y="0" width="3.2" height="2" rx="0.6" fill="#CA8A04"/>
-            </g>`),
-
-        // Kamu Duyurusu — gok mavi badge, beyaz megafon
-        kamu_duyurusu: pinSvgOlustur('#0EA5E9',
-            `<g fill="#fff" transform="translate(20,18)">
-                <path d="M-6,-1 L1,-5 V5 L-6,1 Z"/>
-                <rect x="1" y="-2" width="2.2" height="4" rx="1"/>
-                <path d="M-5,2 L-3,7" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
-            </g>`),
-
-        // Medya ve Magazin — pembe badge, beyaz klaket
-        medya_magazin: pinSvgOlustur('#DB2777',
-            `<g fill="#fff" transform="translate(20,18)">
-                <rect x="-7" y="-1.5" width="14" height="8.5" rx="1.5"/>
-                <path d="M-7,-5.5 H7 V-1.5 H-7 Z"/>
-                <path d="M-4,-5.5 L-1,-1.5 M0,-5.5 L3,-1.5 M4,-5.5 L7,-1.5" stroke="#DB2777" stroke-width="1.5"/>
-            </g>`),
-
-        // Elektrik Kesintisi — koyu badge, sarı şimşek
-        elektrik_kesintisi: pinSvgOlustur('#1e293b',
-            `<polygon points="22,8 16,17.5 19,17.5 16,26 24,15.5 20.5,15.5 22.5,8" fill="#FACC15"/>`),
-
         // Kültürel Etkinlik — mavi badge, beyaz müzik notu
         kulturel_etkinlik: pinSvgOlustur('#2563EB',
             `<g fill="#fff" transform="translate(20,18)">
@@ -195,15 +110,6 @@ function markerIkonlariniHazirla() {
                 <rect x="-0.8" y="-7" width="2.2" height="12.5"/>
                 <rect x="3.7" y="-7" width="2.2" height="10.5"/>
                 <path d="M1.4,-7 L5.9,-7 L5.9,-4 L1.4,-4Z" rx="1"/>
-            </g>`),
-
-        // Diğer — gri badge, beyaz belge
-        diger: pinSvgOlustur('#6B7280',
-            `<g fill="#fff" transform="translate(20,18)">
-                <rect x="-6" y="-7.5" width="12" height="15" rx="2"/>
-                <line x1="-3.5" y1="-4" x2="3.5" y2="-4" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="-3.5" y1="-0.8" x2="3.5" y2="-0.8" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round"/>
-                <line x1="-3.5" y1="2.4" x2="1.5" y2="2.4" stroke="#6B7280" stroke-width="1.5" stroke-linecap="round"/>
             </g>`),
     };
 
@@ -328,8 +234,7 @@ function haberleriHaritayaEkle(haberListesi) {
 function markerOlustur(haber, gosterimKonumu = null, haberAnahtari = null) {
     markerIkonlariniHazirla();
 
-    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
-    const ikon = MARKER_ICONS[haber.haber_turu] || MARKER_ICONS['diger'];
+    const ikon = MARKER_ICONS[haber.haber_turu] || MARKER_ICONS['trafik_kazasi'];
     const konum = gosterimKonumu || { lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng };
 
     const marker = new google.maps.Marker({
@@ -414,7 +319,6 @@ function cakisanMarkerKonumlariniHesapla(haberListesi) {
 function infoWindowAc(marker, haber) {
     const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
     const tarih = haber.tarih ? tarihFormatla(haber.tarih) : 'Tarih bilinmiyor';
-    const kaynaklar = haber.kaynaklar ? haber.kaynaklar.map(k => k.kaynak_adi).join(', ') : (haber.kaynak_adi || '');
     const kaynakSayisi = haber.kaynaklar ? haber.kaynaklar.length : 1;
     const icerikOzet = haber.icerik ? haber.icerik.substring(0, 150) + (haber.icerik.length > 150 ? '...' : '') : '';
 
@@ -425,7 +329,22 @@ function infoWindowAc(marker, haber) {
     }
     const konumMetni = konum.length > 0 ? konum.join(', ') : 'Kocaeli';
 
-    const haberLinki = haber.haber_linki || (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].link : '#');
+    // Tüm kaynakların linklerini oluştur (PDF: tüm kaynaklar listelenmelidir)
+    let kaynakLinksHtml = '';
+    if (haber.kaynaklar && haber.kaynaklar.length > 0) {
+        kaynakLinksHtml = haber.kaynaklar.map(k =>
+            `<a href="${escapeHtml(k.link || '#')}" target="_blank" rel="noopener"
+                style="display:block;text-align:center;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12.5px;font-weight:700;letter-spacing:0.3px;box-shadow:0 3px 8px rgba(99,102,241,0.25);margin-bottom:6px;">
+                ${escapeHtml(k.kaynak_adi || 'Kaynak')} &rarr; Habere Git
+            </a>`
+        ).join('');
+    } else {
+        const haberLinki = haber.haber_linki || '#';
+        kaynakLinksHtml = `<a href="${escapeHtml(haberLinki)}" target="_blank" rel="noopener"
+            style="display:block;text-align:center;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12.5px;font-weight:700;">
+            Habere Git &rarr;
+        </a>`;
+    }
 
     const icerik = `
         <div style="font-family:'Inter',sans-serif;max-width:330px;padding:4px;">
@@ -438,14 +357,10 @@ function infoWindowAc(marker, haber) {
                 </span>
                 <span>📅 ${tarih}</span>
                 <span>📍 ${escapeHtml(konumMetni)}</span>
-                ${kaynaklar ? `<span>📰 ${escapeHtml(kaynaklar)}</span>` : ''}
                 ${kaynakSayisi > 1 ? `<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;">📡 ${kaynakSayisi} kaynakta</span>` : ''}
             </div>
             ${icerikOzet ? `<div style="font-size:12.5px;color:#64748b;line-height:1.55;margin-bottom:12px;padding:8px 10px;background:#f8fafc;border-radius:8px;border-left:3px solid ${turBilgi.color};">${escapeHtml(icerikOzet)}</div>` : ''}
-            <a href="${escapeHtml(haberLinki)}" target="_blank" rel="noopener"
-               style="display:block;text-align:center;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-size:13.5px;font-weight:700;letter-spacing:0.3px;box-shadow:0 4px 12px rgba(99,102,241,0.3);transition:all 0.2s;">
-                Habere Git &rarr;
-            </a>
+            ${kaynakLinksHtml}
         </div>
     `;
 
@@ -494,37 +409,82 @@ function filtreleriTemizle() {
 
 // ==================== UI GÜNCELLEME ====================
 
+// ==================== SANAL LİSTE (VIRTUAL SCROLL) ====================
+// Binlerce haberi DOM'a eklemek yerine sadece görünür olanları render eder.
+
+const KART_YUKSEKLIGI = 90; // px — ortalama kart yüksekliği
+let _virtualListesi = [];
+let _scrollHandler = null;
+
+function haberKartiHtml(haber, index) {
+    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
+    const tarih = haber.tarih ? tarihFormatla(haber.tarih) : '';
+    const kaynak = haber.kaynak_adi || (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].kaynak_adi : '');
+    const kaynakSayisi = haber.kaynaklar ? haber.kaynaklar.length : 1;
+    const multiSourceBadge = kaynakSayisi > 1
+        ? `<span class="multi-source-badge">📡 ${kaynakSayisi} kaynak</span>`
+        : '';
+    return `<div class="haber-card" style="border-left-color:${turBilgi.color};position:absolute;left:0;right:0;top:${index * KART_YUKSEKLIGI}px"
+             onclick="habereTikla(${index})" title="${escapeHtml(haber.baslik)}">
+        <div class="haber-card-title">${escapeHtml(haber.baslik)}</div>
+        <div class="haber-card-meta">
+            <span class="haber-card-tag" style="background-color:${turBilgi.color}">${turBilgi.icon} ${turBilgi.label}</span>
+            ${multiSourceBadge}
+            ${tarih ? `<span>📅 ${tarih}</span>` : ''}
+            ${kaynak ? `<span>📰 ${escapeHtml(kaynak)}</span>` : ''}
+        </div>
+    </div>`;
+}
+
 function haberListesiniGuncelle(haberListesi) {
+    _virtualListesi = haberListesi;
     const container = document.getElementById('haber-listesi');
+
     if (haberListesi.length === 0) {
         container.innerHTML = '<p class="loading-text">Gösterilecek haber bulunamadı.</p>';
+        container.style.position = '';
+        container.style.height = '';
+        container.style.overflowY = '';
+        if (_scrollHandler) {
+            container.removeEventListener('scroll', _scrollHandler);
+            _scrollHandler = null;
+        }
         return;
     }
-    let html = '';
-    haberListesi.forEach((haber, index) => {
-        const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
-        const tarih = haber.tarih ? tarihFormatla(haber.tarih) : '';
-        const kaynak = haber.kaynak_adi || (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].kaynak_adi : '');
-        const kaynakSayisi = haber.kaynaklar ? haber.kaynaklar.length : 1;
-        const multiSourceBadge = kaynakSayisi > 1
-            ? `<span class="multi-source-badge">📡 ${kaynakSayisi} kaynak</span>`
-            : '';
-        html += `
-            <div class="haber-card" style="border-left-color: ${turBilgi.color}"
-                 onclick="habereTikla(${index})" title="${escapeHtml(haber.baslik)}">
-                <div class="haber-card-title">${escapeHtml(haber.baslik)}</div>
-                <div class="haber-card-meta">
-                    <span class="haber-card-tag" style="background-color: ${turBilgi.color}">
-                        ${turBilgi.icon} ${turBilgi.label}
-                    </span>
-                    ${multiSourceBadge}
-                    ${tarih ? `<span>📅 ${tarih}</span>` : ''}
-                    ${kaynak ? `<span>📰 ${escapeHtml(kaynak)}</span>` : ''}
-                </div>
-            </div>
-        `;
-    });
-    container.innerHTML = html;
+
+    const toplamYukseklik = haberListesi.length * KART_YUKSEKLIGI;
+    container.style.position = 'relative';
+    container.style.height = toplamYukseklik + 'px';
+    container.style.overflowY = 'auto';
+
+    // İç scroll alanı
+    const scrollParent = container.closest('.sidebar-section') || container.parentElement;
+
+    function render() {
+        const scrollTop = scrollParent.scrollTop || 0;
+        const goruntulenenYukseklik = scrollParent.clientHeight || 600;
+        const tampon = goruntulenenYukseklik; // üst+alt tampon
+        const baslangic = Math.max(0, Math.floor((scrollTop - tampon) / KART_YUKSEKLIGI));
+        const bitis = Math.min(
+            haberListesi.length - 1,
+            Math.ceil((scrollTop + goruntulenenYukseklik + tampon) / KART_YUKSEKLIGI)
+        );
+
+        let html = '';
+        for (let i = baslangic; i <= bitis; i++) {
+            html += haberKartiHtml(haberListesi[i], i);
+        }
+        container.innerHTML = html;
+    }
+
+    render();
+
+    if (_scrollHandler) {
+        (container.closest('.sidebar-section') || container.parentElement)
+            .removeEventListener('scroll', _scrollHandler);
+    }
+    _scrollHandler = render;
+    scrollParent.addEventListener('scroll', _scrollHandler, { passive: true });
 }
 
 function habereTikla(index) {
@@ -595,3 +555,76 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// ==================== HABER DETAY PANELİ ====================
+
+async function haberDetayPaneliAc() {
+    const modal = document.getElementById('haber-detay-modal');
+    const tbody = document.getElementById('haber-tablo-body');
+    modal.style.display = 'flex';
+    tbody.innerHTML = '<tr><td colspan="6" class="tablo-yukleniyor">Yükleniyor...</td></tr>';
+
+    try {
+        const params = filtreParametreleriOlustur();
+        params.sadece_konumlu = 'false';
+        params.limit = 500;
+        params._ts = Date.now();
+        const queryString = new URLSearchParams(params).toString();
+        const response = await fetch(`/api/haberler?${queryString}`, { cache: 'no-store' });
+        const data = await response.json();
+
+        if (data.basarili && data.haberler.length > 0) {
+            document.getElementById('modal-haber-sayisi').textContent = `${data.haberler.length} haber`;
+            tbody.innerHTML = data.haberler.map(haber => haberTabloSatiri(haber)).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="tablo-yukleniyor">Haber bulunamadi.</td></tr>';
+            document.getElementById('modal-haber-sayisi').textContent = '0 haber';
+        }
+    } catch (error) {
+        console.error('Haber detay paneli hatasi:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="tablo-yukleniyor">Veriler yuklenirken hata olustu.</td></tr>';
+    }
+}
+
+function haberTabloSatiri(haber) {
+    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '?', label: 'Bilinmiyor' };
+    const tarih = haber.tarih ? tarihFormatla(haber.tarih) : '-';
+    const kaynak = haber.kaynak_adi || '-';
+    const ilce = (haber.konum_bilgisi && haber.konum_bilgisi.ilce) ? haber.konum_bilgisi.ilce : '-';
+    const link = haber.haber_linki || '#';
+
+    // Diger kaynaklar satiri
+    let cokluKaynak = '';
+    if (haber.kaynaklar && haber.kaynaklar.length > 1) {
+        const digerler = haber.kaynaklar.slice(1).map(k =>
+            `<a href="${escapeHtml(k.link || '#')}" target="_blank" rel="noopener" style="color:#6366f1;">${escapeHtml(k.kaynak_adi)}</a>`
+        ).join(', ');
+        cokluKaynak = `<div class="tablo-coklu-kaynak">+ ${digerler}</div>`;
+    }
+
+    return `<tr>
+        <td><span class="tablo-tur-badge" style="background:${turBilgi.color}">${turBilgi.icon} ${turBilgi.label}</span></td>
+        <td class="tablo-baslik">${escapeHtml(haber.baslik)}</td>
+        <td class="tablo-kaynak">${escapeHtml(kaynak)}${cokluKaynak}</td>
+        <td class="tablo-ilce">${escapeHtml(ilce)}</td>
+        <td class="tablo-tarih">${tarih}</td>
+        <td><a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="tablo-link-btn">Habere Git &rarr;</a></td>
+    </tr>`;
+}
+
+function haberDetayPaneliKapat() {
+    document.getElementById('haber-detay-modal').style.display = 'none';
+}
+
+function modalDisindaTikla(event) {
+    if (event.target === event.currentTarget) {
+        haberDetayPaneliKapat();
+    }
+}
+
+// ESC tusu ile modal kapatma
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        haberDetayPaneliKapat();
+    }
+});

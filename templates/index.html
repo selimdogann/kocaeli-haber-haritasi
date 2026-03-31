@@ -18,6 +18,9 @@
             <span class="subtitle">Kentsel Haber İzleme Sistemi</span>
         </div>
         <div class="header-right">
+            <button class="btn btn-secondary" onclick="haberDetayPaneliAc()">
+                📋 Haber Detayları
+            </button>
             <button id="btn-scrape" class="btn btn-primary" onclick="scrapingBaslat()">
                 🔄 Haberleri Güncelle
             </button>
@@ -117,6 +120,36 @@
 
     <!-- BİLDİRİM -->
     <div id="bildirim" class="bildirim" style="display: none;"></div>
+
+    <!-- HABER DETAY MODAL -->
+    <div id="haber-detay-modal" class="modal-overlay" style="display:none;" onclick="modalDisindaTikla(event)">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>📋 Haber Detayları</h2>
+                <div class="modal-header-right">
+                    <span id="modal-haber-sayisi" class="modal-badge">0 haber</span>
+                    <button class="modal-kapat-btn" onclick="haberDetayPaneliKapat()">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <table class="haber-tablo">
+                    <thead>
+                        <tr>
+                            <th>Tür</th>
+                            <th>Başlık</th>
+                            <th>Kaynak Site</th>
+                            <th>İlçe</th>
+                            <th>Tarih</th>
+                            <th>Link</th>
+                        </tr>
+                    </thead>
+                    <tbody id="haber-tablo-body">
+                        <tr><td colspan="6" class="tablo-yukleniyor">Yükleniyor...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <!-- JavaScript -->
     <script>
