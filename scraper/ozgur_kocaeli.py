@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 class OzgurKocaeliScraper(BaseScraper):
     """Özgür Kocaeli haber sitesi scraper'ı (Daktilo CMS)."""
 
+    CLOUDFLARE_KORUMALI = True
+
     IGNORE_PHRASES = [
         "Yorumunuz",
         "Topluluk Kuralları",

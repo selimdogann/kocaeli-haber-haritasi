@@ -28,13 +28,15 @@ class CagdasKocaeliScraper(BaseScraper):
             kaynak_adi="Çağdaş Kocaeli",
             base_url="https://www.cagdaskocaeli.com.tr",
         )
-        # Çağdaş Kocaeli ana sayfa + mümkün kategori sayfaları
+        # Çağdaş Kocaeli ana sayfa + kategori sayfaları
         self.kategori_urls = [
-            self.base_url,  # Ana sayfa (haber listesi içerir)
-            f"{self.base_url}/kocaeli-haberleri",
+            self.base_url,
             f"{self.base_url}/kocaeli-asayis-haberleri",
-            f"{self.base_url}/kocaeli-yasam-haberleri",
             f"{self.base_url}/kocaeli-ekonomi-haberleri",
+            f"{self.base_url}/kocaeli-siyaset-haberleri",
+            f"{self.base_url}/kocaeli-gundem-haberleri",
+            f"{self.base_url}/guncel",
+            f"{self.base_url}/yasam",
         ]
 
     def _haber_linki_mi(self, href: str) -> bool:

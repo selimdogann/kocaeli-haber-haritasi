@@ -3,6 +3,7 @@ Kocaeli Haber Haritası - Temel Scraper Sınıfı
 
 Tüm haber sitesi scraper'larının miras aldığı soyut temel sınıf.
 Her haber sitesi için ortak işlevsellik sağlar.
+Cloudflare korumalı siteler için Selenium desteği içerir.
 """
 
 import requests
@@ -16,9 +17,70 @@ from config.settings import Config
 
 logger = logging.getLogger(__name__)
 
+# Selenium driver'ı tüm Cloudflare scraper'lar arasında paylaşılır (singleton)
+_selenium_driver = None
+
+
+def _selenium_driver_olustur():
+    """Selenium WebDriver oluşturur (singleton)."""
+    global _selenium_driver
+    if _selenium_driver is not None:
+        try:
+            _selenium_driver.title  # Bağlantı hala aktif mi?
+            return _selenium_driver
+        except Exception:
+            _selenium_driver = None
+
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
+        from webdriver_manager.chrome import ChromeDriverManager
+
+        options = Options()
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
+        options.add_argument(
+            "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+        )
+        options.add_argument("--window-position=-2400,-2400")
+
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {"source": 'Object.defineProperty(navigator, "webdriver", {get: () => undefined})'},
+        )
+        driver.set_page_load_timeout(30)
+
+        _selenium_driver = driver
+        logger.info("Selenium WebDriver başlatıldı (Cloudflare bypass).")
+        return driver
+    except Exception as e:
+        logger.error(f"Selenium başlatma hatası: {e}")
+        return None
+
+
+def selenium_driver_kapat():
+    """Selenium driver'ı kapatır."""
+    global _selenium_driver
+    if _selenium_driver is not None:
+        try:
+            _selenium_driver.quit()
+        except Exception:
+            pass
+        _selenium_driver = None
+
 
 class BaseScraper(ABC):
     """Tüm scraper'ların temel sınıfı."""
+
+    # Alt sınıflar True yaparak Selenium kullanımını etkinleştirir
+    CLOUDFLARE_KORUMALI = False
 
     def __init__(self, kaynak_adi: str, base_url: str):
         """
@@ -48,6 +110,7 @@ class BaseScraper(ABC):
     def sayfa_getir(self, url: str) -> BeautifulSoup:
         """
         Verilen URL'den HTML içeriğini çeker ve BeautifulSoup nesnesi döndürür.
+        Cloudflare korumalı siteler için otomatik olarak Selenium kullanır.
 
         Args:
             url: Çekilecek sayfa URL'si
@@ -55,16 +118,21 @@ class BaseScraper(ABC):
         Returns:
             BeautifulSoup: Ayrıştırılmış HTML nesnesi veya None
         """
+        if self.CLOUDFLARE_KORUMALI:
+            return self._sayfa_getir_selenium(url)
+        return self._sayfa_getir_requests(url)
+
+    def _sayfa_getir_requests(self, url: str) -> BeautifulSoup:
+        """Standart requests kütüphanesi ile sayfa çeker."""
         try:
             if self.gecikme > 0:
-                time.sleep(self.gecikme)  # Rate limiting
+                time.sleep(self.gecikme)
 
             response = self.session.get(url, timeout=self.timeout)
             response.raise_for_status()
 
-            # Encoding: Content-Type charset > apparent_encoding > utf-8
             if response.encoding and response.encoding.lower() != "iso-8859-1":
-                pass  # requests tarafından doğru belirlendi
+                pass
             elif response.apparent_encoding:
                 response.encoding = response.apparent_encoding
             else:
@@ -80,6 +148,31 @@ class BaseScraper(ABC):
             logger.error(f"Bağlantı hatası: {url}")
         except Exception as e:
             logger.error(f"Sayfa çekme hatası: {url} - {e}")
+
+        return None
+
+    def _sayfa_getir_selenium(self, url: str) -> BeautifulSoup:
+        """Selenium WebDriver ile sayfa çeker (Cloudflare bypass)."""
+        driver = _selenium_driver_olustur()
+        if not driver:
+            logger.error(f"Selenium kullanılamıyor, requests ile deneniyor: {url}")
+            return self._sayfa_getir_requests(url)
+
+        try:
+            if self.gecikme > 0:
+                time.sleep(self.gecikme)
+
+            driver.get(url)
+            # Cloudflare challenge'ın çözülmesi için bekle
+            time.sleep(3)
+
+            # Sayfa yüklendiyse parse et
+            html = driver.page_source
+            if html and len(html) > 1000:
+                return BeautifulSoup(html, "lxml")
+
+        except Exception as e:
+            logger.error(f"Selenium sayfa çekme hatası: {url} - {e}")
 
         return None
 
@@ -281,13 +374,13 @@ class BaseScraper(ABC):
                 try:
                     haber = self.haber_detay_getir(link)
                     if haber and haber.get("baslik"):
-                        # Tarihi olan haberlerde son N gün kuralını uygula.
-                        if haber.get("yayin_tarihi") and not self.son_n_gun_icinde_mi(
-                            haber["yayin_tarihi"]
-                        ):
+                        # Tarihi olmayan haberler atlanır (son 3 gün zorunluluğu)
+                        if not haber.get("yayin_tarihi"):
                             return None
 
-                        # Tarihi çözülemeyen haberler yine alınır; bazı siteler tarih alanını eksik veriyor.
+                        # Son N gün dışındaki haberler atlanır
+                        if not self.son_n_gun_icinde_mi(haber["yayin_tarihi"]):
+                            return None
 
                         haber["kaynak_site"] = self.kaynak_adi
                         haber["haber_linki"] = link
@@ -304,8 +397,8 @@ class BaseScraper(ABC):
 
             max_workers = max(1, int(getattr(Config, "SCRAPER_MAX_WORKERS", 8)))
 
-            # Küçük listelerde thread maliyetine gerek yok
-            if max_workers == 1 or len(haber_linkleri) < 6:
+            # Cloudflare korumalı siteler Selenium kullandığı için seri çalışmalı
+            if self.CLOUDFLARE_KORUMALI or max_workers == 1 or len(haber_linkleri) < 6:
                 for link in haber_linkleri:
                     sonuc = _tek_haber_cek(link)
                     if sonuc:
