@@ -10,6 +10,7 @@ from pymongo.errors import DuplicateKeyError, ConnectionFailure
 from datetime import datetime, timedelta
 from config.settings import Config
 import logging
+import numpy as np
 
 # Loglama yapılandırması
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class MongoDB:
         """Veritabanı koleksiyonlarını ayarlar."""
         self.news_collection = self.db["haberler"]
         self.locations_collection = self.db["konumlar"]
+        self.embeddings_collection = self.db["embeddingler"]
 
     def _create_indexes(self):
         """Performans için gerekli indexleri oluşturur."""
@@ -150,21 +152,26 @@ class MongoDB:
             logger.error(f"Kaynak ekleme hatası: {e}")
             return False
 
-    def tum_haberleri_getir(self, filtreler: dict = None) -> list:
+    def tum_haberleri_getir(self, filtreler: dict = None, limit: int = 0, skip: int = 0) -> list:
         """
-        Tüm haberleri getirir, opsiyonel filtreleme ile.
+        Tüm haberleri getirir, opsiyonel filtreleme ve sayfalama ile.
 
         Args:
             filtreler: MongoDB sorgu filtresi
+            limit: Maksimum kayıt sayısı (0 = sınırsız)
+            skip: Atlanacak kayıt sayısı (sayfalama için)
 
         Returns:
             list: Haber listesi
         """
         try:
             sorgu = filtreler or {}
-            haberler = list(
-                self.news_collection.find(sorgu).sort("yayin_tarihi", DESCENDING)
-            )
+            cursor = self.news_collection.find(sorgu).sort("yayin_tarihi", DESCENDING)
+            if skip:
+                cursor = cursor.skip(skip)
+            if limit:
+                cursor = cursor.limit(limit)
+            haberler = list(cursor)
             # ObjectId'yi string'e çevir
             for haber in haberler:
                 haber["_id"] = str(haber["_id"])
@@ -173,12 +180,22 @@ class MongoDB:
             logger.error(f"Haber getirme hatası: {e}")
             return []
 
+    def haber_sayisi(self, filtreler: dict = None) -> int:
+        """Verilen filtreye göre toplam haber sayısını döndürür."""
+        try:
+            return self.news_collection.count_documents(filtreler or {})
+        except Exception as e:
+            logger.error(f"Haber sayısı hatası: {e}")
+            return 0
+
     def haberleri_filtrele(
         self,
         haber_turu: str = None,
         ilce: str = None,
         baslangic_tarihi: str = None,
         bitis_tarihi: str = None,
+        limit: int = 0,
+        skip: int = 0,
     ) -> list:
         """
         Haberleri türe, ilçeye ve tarih aralığına göre filtreler.
@@ -188,6 +205,8 @@ class MongoDB:
             ilce: İlçe filtresi
             baslangic_tarihi: Başlangıç tarihi (YYYY-MM-DD)
             bitis_tarihi: Bitiş tarihi (YYYY-MM-DD)
+            limit: Sayfa başı kayıt sayısı (0 = sınırsız)
+            skip: Atlanacak kayıt sayısı
 
         Returns:
             list: Filtrelenmiş haber listesi
@@ -199,7 +218,7 @@ class MongoDB:
             bitis_tarihi=bitis_tarihi,
             sadece_konumlu=True,
         )
-        return self.tum_haberleri_getir(filtre)
+        return self.tum_haberleri_getir(filtre, limit=limit, skip=skip)
 
     def haber_linki_var_mi(self, haber_linki: str) -> bool:
         """
@@ -375,33 +394,158 @@ class MongoDB:
 
         if baslangic_tarihi or bitis_tarihi:
             tarih_filtre = {}
-            if baslangic_tarihi:
-                tarih_filtre["$gte"] = datetime.strptime(
-                    baslangic_tarihi, "%Y-%m-%d"
-                )
-            if bitis_tarihi:
-                tarih_filtre["$lte"] = datetime.strptime(
-                    bitis_tarihi, "%Y-%m-%d"
-                ) + timedelta(days=1)
-            filtre["yayin_tarihi"] = tarih_filtre
+            try:
+                if baslangic_tarihi:
+                    tarih_filtre["$gte"] = datetime.strptime(
+                        baslangic_tarihi, "%Y-%m-%d"
+                    )
+                if bitis_tarihi:
+                    tarih_filtre["$lte"] = datetime.strptime(
+                        bitis_tarihi, "%Y-%m-%d"
+                    ) + timedelta(days=1)
+            except ValueError as e:
+                logger.warning(f"Geçersiz tarih formatı (beklenen YYYY-MM-DD): {e}")
+                tarih_filtre = {}
+            if tarih_filtre:
+                filtre["yayin_tarihi"] = tarih_filtre
         else:
+            # Varsayılan: sadece son 3 günlük haberler (tarihsiz haberler dahil edilmez)
             varsayilan_baslangic = datetime.now() - timedelta(days=Config.SCRAPING_DAYS)
-            filtre["$or"] = [
-                {"yayin_tarihi": {"$gte": varsayilan_baslangic}},
-                {"yayin_tarihi": {"$exists": False}},
-                {"yayin_tarihi": None},
-            ]
+            filtre["yayin_tarihi"] = {"$gte": varsayilan_baslangic}
+
+        # Sadece geçerli 5 haber türünü göster (haber_turu filtresi yoksa)
+        if not haber_turu:
+            gecerli_turler = list(Config.NEWS_TYPES.keys())
+            filtre["haber_turu"] = {"$in": gecerli_turler}
 
         if sadece_konumlu:
             filtre["konum_geojson"] = {"$exists": True}
 
         return filtre
 
+    def eski_haberleri_temizle(self, gun: int = None) -> dict:
+        """
+        Son N günden eski haberleri ve ilişkili embedding'leri siler.
+
+        Args:
+            gun: Kaç günden eski haberler silinsin (varsayılan: Config.SCRAPING_DAYS)
+
+        Returns:
+            dict: {silinen_haber, silinen_embedding}
+        """
+        if gun is None:
+            gun = Config.SCRAPING_DAYS
+
+        sinir_tarih = datetime.now() - timedelta(days=gun)
+
+        try:
+            # Silinecek haberlerin linklerini al (embedding temizliği için)
+            eski_haberler = self.news_collection.find(
+                {"$or": [
+                    {"yayin_tarihi": {"$lt": sinir_tarih}},
+                    {"yayin_tarihi": None},
+                    {"yayin_tarihi": {"$exists": False}},
+                ]},
+                {"haber_linki": 1, "_id": 0},
+            )
+            eski_linkler = [h["haber_linki"] for h in eski_haberler if h.get("haber_linki")]
+
+            # Eski haberleri sil
+            haber_sonuc = self.news_collection.delete_many(
+                {"$or": [
+                    {"yayin_tarihi": {"$lt": sinir_tarih}},
+                    {"yayin_tarihi": None},
+                    {"yayin_tarihi": {"$exists": False}},
+                ]}
+            )
+
+            # İlişkili embedding'leri sil
+            embedding_sonuc_sayisi = 0
+            if eski_linkler:
+                embedding_sonuc = self.embeddings_collection.delete_many(
+                    {"haber_linki": {"$in": eski_linkler}}
+                )
+                embedding_sonuc_sayisi = embedding_sonuc.deleted_count
+
+            sonuc = {
+                "silinen_haber": haber_sonuc.deleted_count,
+                "silinen_embedding": embedding_sonuc_sayisi,
+            }
+
+            if sonuc["silinen_haber"] > 0:
+                logger.info(
+                    f"Eski veri temizlendi: {sonuc['silinen_haber']} haber, "
+                    f"{sonuc['silinen_embedding']} embedding silindi."
+                )
+
+            return sonuc
+
+        except Exception as e:
+            logger.error(f"Eski haber temizleme hatası: {e}")
+            return {"silinen_haber": 0, "silinen_embedding": 0}
+
     def veritabanini_temizle(self):
         """Tüm verileri siler (geliştirme amaçlı)."""
         self.news_collection.delete_many({})
         self.locations_collection.delete_many({})
+        self.embeddings_collection.delete_many({})
         logger.warning("Veritabanı tamamen temizlendi!")
+
+    # ==========================================
+    # EMBEDDİNG CACHE İŞLEMLERİ
+    # ==========================================
+
+    def embedding_kaydet(self, haber_linki: str, embedding: list) -> bool:
+        """
+        Haber embedding vektörünü veritabanına kaydeder.
+        Sonraki çalışmalarda yeniden hesaplama önlenir.
+
+        Args:
+            haber_linki: Haberin benzersiz linki
+            embedding: Numpy dizisi veya liste olarak embedding vektörü
+        """
+        try:
+            if hasattr(embedding, "tolist"):
+                embedding = embedding.tolist()
+            self.embeddings_collection.update_one(
+                {"haber_linki": haber_linki},
+                {"$set": {"haber_linki": haber_linki, "embedding": embedding}},
+                upsert=True,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Embedding kaydetme hatası: {e}")
+            return False
+
+    def embeddingleri_getir(self) -> tuple:
+        """
+        Tüm kayıtlı embedding'leri getirir.
+
+        Returns:
+            tuple: (haber_linkleri listesi, numpy embedding matrisi)
+                   Kayıt yoksa ([], np.array([]))
+        """
+        try:
+            kayitlar = list(
+                self.embeddings_collection.find({}, {"haber_linki": 1, "embedding": 1, "_id": 0})
+            )
+            if not kayitlar:
+                return [], np.array([])
+            linkler = [k["haber_linki"] for k in kayitlar]
+            matris = np.array([k["embedding"] for k in kayitlar])
+            return linkler, matris
+        except Exception as e:
+            logger.error(f"Embedding getirme hatası: {e}")
+            return [], np.array([])
+
+    def embedding_sil(self, haber_linki: str) -> bool:
+        """Belirli bir haberin embedding kaydını siler."""
+        try:
+            self.embeddings_collection.delete_one({"haber_linki": haber_linki})
+            return True
+        except Exception as e:
+            logger.error(f"Embedding silme hatası: {e}")
+            return False
 
     def baglantiyi_kapat(self):
         """MongoDB bağlantısını kapatır."""

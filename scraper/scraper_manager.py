@@ -6,8 +6,11 @@ temizler, sınıflandırır, konumlarını çıkarır ve veritabanına kaydeder.
 """
 
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import numpy as np
+from scraper.base_scraper import selenium_driver_kapat
 from scraper.cagdas_kocaeli import CagdasKocaeliScraper
 from scraper.ozgur_kocaeli import OzgurKocaeliScraper
 from scraper.ses_kocaeli import SesKocaeliScraper
@@ -19,13 +22,14 @@ from processing.location_extractor import LocationExtractor
 from processing.similarity import SimilarityAnalyzer
 from geocoding.geocoder import Geocoder
 from database.mongodb import MongoDB
+from config.settings import Config
 
 logger = logging.getLogger(__name__)
 
 # Global ilerleme durumu (thread-safe basit dict)
 scrape_progress = {
     "aktif": False,
-    "aşama": "",
+    "asama": "",
     "kaynak": "",
     "kaynak_no": 0,
     "toplam_kaynak": 5,
@@ -70,6 +74,9 @@ class ScraperManager:
         self._mevcut_linkler_cache = set()
         self._mevcut_embeddingler_cache = np.array([])
 
+        # Paralel işleme için paylaşılan cache'leri koruyacak kilit
+        self._cache_lock = threading.Lock()
+
     @property
     def benzerlik_analizoru(self):
         """Benzerlik analizörünü lazy loading ile yükler."""
@@ -100,7 +107,7 @@ class ScraperManager:
 
         # İlerleme durumunu başlat
         scrape_progress["aktif"] = True
-        scrape_progress["aşama"] = "Hazırlanıyor..."
+        scrape_progress["asama"] = "Hazırlanıyor..."
         scrape_progress["kaynak"] = ""
         scrape_progress["kaynak_no"] = 0
         scrape_progress["toplam_kaynak"] = len(self.scraperlar)
@@ -108,7 +115,22 @@ class ScraperManager:
         scrape_progress["toplam_haber"] = 0
         scrape_progress["yuzde"] = 0
 
-        # 0. Performans için mevcut haber/cache hazırlığı
+        # 0. DB bağlantısı kontrolü
+        if not self.db:
+            logger.error(
+                "MongoDB bağlantısı yok! Haberler işlenecek ancak veritabanına kaydedilemeyecek."
+            )
+
+        # 0a. Eski haberleri temizle (son 3 günden eskiler silinir)
+        if self.db:
+            temizlik = self.db.eski_haberleri_temizle()
+            if temizlik["silinen_haber"] > 0:
+                logger.info(
+                    f"🗑️ Eski veri temizliği: {temizlik['silinen_haber']} haber, "
+                    f"{temizlik['silinen_embedding']} embedding silindi."
+                )
+
+        # 0b. Performans için mevcut haber/cache hazırlığı
         if self.db:
             self._mevcut_haberler_cache = self.db.tum_haber_metinlerini_getir()
             self._mevcut_linkler_cache = {
@@ -118,18 +140,36 @@ class ScraperManager:
             }
 
             if self._mevcut_haberler_cache:
-                mevcut_metinler = [
-                    f"{h.get('baslik', '')} {h.get('icerik', '')}"
-                    for h in self._mevcut_haberler_cache
-                ]
-                self._mevcut_embeddingler_cache = (
-                    self.benzerlik_analizoru.embeddingleri_olustur(mevcut_metinler)
-                )
+                # Önce MongoDB'deki kayıtlı embedding'leri yükle
+                _linkler, _matris = self.db.embeddingleri_getir()
+                if len(_linkler) == len(self._mevcut_haberler_cache):
+                    # Cache tam ve güncel → doğrudan kullan
+                    self._mevcut_embeddingler_cache = _matris
+                    logger.info(
+                        f"Embedding cache MongoDB'den yüklendi ({len(_linkler)} kayıt)."
+                    )
+                else:
+                    # Cache eksik veya güncel değil → yeniden hesapla ve kaydet
+                    logger.info("Embedding cache yeniden hesaplanıyor...")
+                    mevcut_metinler = [
+                        f"{h.get('baslik', '')} {h.get('icerik', '')}"
+                        for h in self._mevcut_haberler_cache
+                    ]
+                    self._mevcut_embeddingler_cache = (
+                        self.benzerlik_analizoru.embeddingleri_olustur(mevcut_metinler)
+                    )
+                    # Yeni hesaplanan embedding'leri MongoDB'ye kaydet
+                    for haber, emb in zip(
+                        self._mevcut_haberler_cache,
+                        self._mevcut_embeddingler_cache,
+                    ):
+                        if haber.get("haber_linki"):
+                            self.db.embedding_kaydet(haber["haber_linki"], emb)
 
         # 1. Tüm kaynaklardan haberleri çek
         for idx, scraper in enumerate(self.scraperlar):
             try:
-                scrape_progress["aşama"] = "Haberler çekiliyor"
+                scrape_progress["asama"] = "Haberler çekiliyor"
                 scrape_progress["kaynak"] = scraper.kaynak_adi
                 scrape_progress["kaynak_no"] = idx + 1
                 scrape_progress["yuzde"] = int((idx / len(self.scraperlar)) * 50)
@@ -150,38 +190,60 @@ class ScraperManager:
 
         logger.info(f"📊 Toplam {len(tum_haberler)} haber çekildi.")
 
-        # 2. Her haberi işle ve kaydet
-        scrape_progress["aşama"] = "Haberler işleniyor"
+        # 2. Her haberi işle ve kaydet (paralel pipeline)
+        scrape_progress["asama"] = "Haberler işleniyor"
         scrape_progress["toplam_haber"] = len(tum_haberler)
         scrape_progress["yuzde"] = 50
-        for i, haber in enumerate(tum_haberler):
+
+        islenen_sayac = [0]  # thread-safe sayaç (liste trick)
+        max_workers = max(1, Config.PROCESSING_MAX_WORKERS)
+
+        def _isle(args):
+            idx, haber = args
             try:
-                scrape_progress["islenen_haber"] = i + 1
-                scrape_progress["yuzde"] = 50 + int((i / max(len(tum_haberler), 1)) * 50)
-                sonuc = self._haber_isle_ve_kaydet(haber)
-
-                if sonuc == "kaydedildi":
-                    rapor["toplam_kaydedilen"] += 1
-                    kaynak = haber.get("kaynak_site", "")
-                    if kaynak in rapor["kaynak_detay"]:
-                        rapor["kaynak_detay"][kaynak]["kaydedilen"] += 1
-                elif sonuc == "tekrar":
-                    rapor["toplam_tekrar"] += 1
-                elif sonuc == "benzer":
-                    rapor["toplam_benzer"] += 1
-                elif sonuc == "konumsuz":
-                    rapor["toplam_konumsuz"] += 1
-
+                return idx, haber, self._haber_isle_ve_kaydet(haber)
             except Exception as e:
-                rapor["hatalar"].append(f"Haber işleme hatası: {e}")
+                return idx, haber, "hata"
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            gelecektekiler = {
+                executor.submit(_isle, (i, haber)): i
+                for i, haber in enumerate(tum_haberler)
+            }
+            for gelecek in as_completed(gelecektekiler):
+                try:
+                    idx, haber, sonuc = gelecek.result()
+                    islenen_sayac[0] += 1
+                    scrape_progress["islenen_haber"] = islenen_sayac[0]
+                    scrape_progress["yuzde"] = 50 + int(
+                        (islenen_sayac[0] / max(len(tum_haberler), 1)) * 50
+                    )
+
+                    if sonuc == "kaydedildi" or sonuc == "konumsuz":
+                        if sonuc == "kaydedildi":
+                            rapor["toplam_kaydedilen"] += 1
+                        else:
+                            rapor["toplam_konumsuz"] += 1
+                        kaynak = haber.get("kaynak_site", "")
+                        if kaynak in rapor["kaynak_detay"]:
+                            rapor["kaynak_detay"][kaynak]["kaydedilen"] += 1
+                    elif sonuc == "tekrar":
+                        rapor["toplam_tekrar"] += 1
+                    elif sonuc == "benzer":
+                        rapor["toplam_benzer"] += 1
+                except Exception as e:
+                    rapor["hatalar"].append(f"Haber işleme hatası: {e}")
 
         bitis = datetime.now()
         rapor["bitis_zamani"] = bitis.isoformat()
         rapor["sure_saniye"] = (bitis - baslangic).total_seconds()
 
+        # Selenium driver'ı kapat (Cloudflare scraper'lar için açılmışsa)
+        selenium_driver_kapat()
+
         # İlerleme durumunu sıfırla
         scrape_progress["aktif"] = False
-        scrape_progress["aşama"] = "Tamamlandı"
+        scrape_progress["asama"] = "Tamamlandı"
         scrape_progress["yuzde"] = 100
 
         logger.info(
@@ -211,11 +273,10 @@ class ScraperManager:
         Returns:
             str: İşlem sonucu ('kaydedildi', 'tekrar', 'benzer', 'konumsuz', 'hata')
         """
-        # ADIM 1: Link bazlı mükerrer kontrol
-        # MongoDB'de haber_linki alanına unique index tanımlıdır.
-        # Aynı link zaten veritabanında varsa işlem yapılmaz.
-        if haber.get("haber_linki") in self._mevcut_linkler_cache:
-            return "tekrar"
+        # ADIM 1: Link bazlı mükerrer kontrol (thread-safe)
+        with self._cache_lock:
+            if haber.get("haber_linki") in self._mevcut_linkler_cache:
+                return "tekrar"
 
         # 2. Metin temizleme
         haber["baslik"] = self.temizleyici.baslik_temizle(
@@ -228,6 +289,10 @@ class ScraperManager:
         if not haber.get("baslik"):
             return "hata"
 
+        if not haber.get("icerik"):
+            logger.debug(f"İçeriksiz haber atlandı: {haber.get('haber_linki', '')}")
+            return "hata"
+
         # ADIM 3: Embedding tabanlı benzerlik kontrolü
         # Farklı kaynaklardan gelen aynı haberin farklı linklere sahip
         # olabileceği durumlar için sentence-transformers modeli kullanılır.
@@ -236,21 +301,27 @@ class ScraperManager:
         # Eşik değeri: 0.90 (Config.SIMILARITY_THRESHOLD)
         yeni_metin = f"{haber['baslik']} {haber.get('icerik', '')}"
 
-        if self.db and self._mevcut_haberler_cache:
-            # Yeni haberin embedding vektörünü oluştur (384 boyutlu)
-            yeni_embedding = self.benzerlik_analizoru.embedding_olustur(yeni_metin)
-            # Mevcut tüm haberlerle kosinüs benzerliğini karşılaştır
+        # ADIM 3 için embedding önceden hesapla (lock dışında — CPU ağır iş)
+        yeni_embedding = self.benzerlik_analizoru.embedding_olustur(yeni_metin)
+
+        with self._cache_lock:
+            cache_var = self.db and len(self._mevcut_haberler_cache) > 0
+            haberler_snap = list(self._mevcut_haberler_cache) if cache_var else []
+            embeddingler_snap = (
+                self._mevcut_embeddingler_cache.copy()
+                if cache_var and len(self._mevcut_embeddingler_cache) > 0
+                else np.array([])
+            )
+
+        if cache_var and yeni_embedding is not None:
             benzerler = self.benzerlik_analizoru.benzerleri_bul(
                 yeni_metin,
-                self._mevcut_haberler_cache,
-                mevcut_embeddingler=self._mevcut_embeddingler_cache,
+                haberler_snap,
+                mevcut_embeddingler=embeddingler_snap,
                 yeni_embedding=yeni_embedding,
             )
 
             if benzerler:
-                # Benzerlik >= 0.90 → Aynı haber kabul edilir.
-                # Ana haberin diger_kaynaklar dizisine yeni kaynak eklenir.
-                # Bu sayede çoklu kaynak bilgisi korunur.
                 en_benzer = benzerler[0]
                 self.db.haber_kaynak_ekle(
                     en_benzer["haber"]["haber_linki"],
@@ -260,7 +331,8 @@ class ScraperManager:
                         "benzerlik_orani": en_benzer["benzerlik_orani"],
                     },
                 )
-                self._mevcut_linkler_cache.add(haber.get("haber_linki"))
+                with self._cache_lock:
+                    self._mevcut_linkler_cache.add(haber.get("haber_linki"))
                 return "benzer"
 
         # ADIM 4: Anahtar kelime tabanlı haber sınıflandırma
@@ -277,11 +349,9 @@ class ScraperManager:
         haber["haber_turu"] = siniflandirma["haber_turu"]
         haber["siniflandirma_guven"] = siniflandirma["guven_skoru"]
 
-        # Sınıflandırılamayan haberler (hiçbir anahtar kelime eşleşmedi)
-        # "diger" kategorisine atanır
+        # Sınıflandırılamayan haberler (5 zorunlu türden hiçbirine uymadı) atlanır
         if not haber["haber_turu"]:
-            haber["haber_turu"] = "diger"
-            haber["siniflandirma_guven"] = 0.0
+            return "hata"
 
         # ADIM 5: Konum bilgisi çıkarımı (NLP / Regex)
         # 8 farklı regex kalıbı ile ilçe, mahalle, cadde/sokak, yol,
@@ -337,28 +407,36 @@ class ScraperManager:
         if self.db:
             basarili = self.db.haber_ekle(haber)
             if basarili:
-                # Cache'leri güncel tut
-                self._mevcut_linkler_cache.add(haber.get("haber_linki"))
-                self._mevcut_haberler_cache.append({
-                    "baslik": haber.get("baslik", ""),
-                    "icerik": haber.get("icerik", ""),
-                    "haber_linki": haber.get("haber_linki", ""),
-                })
+                # Cache'leri thread-safe güncelle
+                with self._cache_lock:
+                    self._mevcut_linkler_cache.add(haber.get("haber_linki"))
+                    self._mevcut_haberler_cache.append({
+                        "baslik": haber.get("baslik", ""),
+                        "icerik": haber.get("icerik", ""),
+                        "haber_linki": haber.get("haber_linki", ""),
+                    })
+                    if yeni_embedding is not None:
+                        if self._mevcut_embeddingler_cache is None or len(self._mevcut_embeddingler_cache) == 0:
+                            self._mevcut_embeddingler_cache = np.array([yeni_embedding])
+                        else:
+                            self._mevcut_embeddingler_cache = np.vstack(
+                                [self._mevcut_embeddingler_cache, yeni_embedding]
+                            )
 
-                yeni_embedding = self.benzerlik_analizoru.embedding_olustur(yeni_metin)
-                if yeni_embedding is not None:
-                    if self._mevcut_embeddingler_cache is None or len(self._mevcut_embeddingler_cache) == 0:
-                        self._mevcut_embeddingler_cache = np.array([yeni_embedding])
-                    else:
-                        self._mevcut_embeddingler_cache = np.vstack(
-                            [self._mevcut_embeddingler_cache, yeni_embedding]
-                        )
+                # Embedding'i kalıcı olarak MongoDB'ye kaydet (lock dışında)
+                if yeni_embedding is not None and haber.get("haber_linki"):
+                    self.db.embedding_kaydet(haber["haber_linki"], yeni_embedding)
 
+                if not haber.get("enlem"):
+                    return "konumsuz"
                 return "kaydedildi"
 
+            # haber_ekle False döndürdü → DuplicateKeyError (link daha önce eklendi)
+            return "tekrar"
+
+        # Veritabanı bağlantısı yok
         if not haber.get("enlem"):
             return "konumsuz"
-
         return "hata"
 
     def tek_kaynak_cek(self, kaynak_index: int) -> dict:
