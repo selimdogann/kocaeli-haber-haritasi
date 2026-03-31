@@ -107,12 +107,14 @@ def _haber_formatla(haber: dict) -> dict:
 @api_bp.route("/haberler", methods=["GET"])
 def haberleri_getir():
     """
-    Haberleri getirir. Filtreleme parametreleri:
+    Haberleri getirir. Filtreleme ve sayfalama parametreleri:
     - haber_turu: Haber türü filtresi
     - ilce: İlçe filtresi
     - baslangic_tarihi: Başlangıç tarihi (YYYY-MM-DD)
     - bitis_tarihi: Bitiş tarihi (YYYY-MM-DD)
     - sadece_konumlu: Sadece konumu olan haberleri getir (varsayılan: true)
+    - sayfa: Sayfa numarası (varsayılan: 1)
+    - limit: Sayfa başı kayıt sayısı (varsayılan: 200, max: 500)
     """
     try:
         db = get_db()
@@ -126,12 +128,23 @@ def haberleri_getir():
         bitis_tarihi = request.args.get("bitis_tarihi")
         sadece_konumlu = request.args.get("sadece_konumlu", "true").lower() == "true"
 
+        # Sayfalama parametreleri
+        try:
+            sayfa = max(1, int(request.args.get("sayfa", 1)))
+            limit = min(500, max(1, int(request.args.get("limit", 200))))
+        except (ValueError, TypeError):
+            sayfa = 1
+            limit = 200
+        skip = (sayfa - 1) * limit
+
         if sadece_konumlu:
             haberler = db.haberleri_filtrele(
                 haber_turu=haber_turu,
                 ilce=ilce,
                 baslangic_tarihi=baslangic_tarihi,
                 bitis_tarihi=bitis_tarihi,
+                limit=limit,
+                skip=skip,
             )
         else:
             filtre = {}
@@ -139,7 +152,7 @@ def haberleri_getir():
                 filtre["haber_turu"] = haber_turu
             if ilce:
                 filtre["konum_metni"] = {"$regex": ilce, "$options": "i"}
-            haberler = db.tum_haberleri_getir(filtre)
+            haberler = db.tum_haberleri_getir(filtre, limit=limit, skip=skip)
 
         # Haberleri frontend formatına dönüştür
         haberler = [_haber_formatla(h) for h in haberler]
@@ -147,6 +160,8 @@ def haberleri_getir():
         return jsonify({
             "basarili": True,
             "toplam": len(haberler),
+            "sayfa": sayfa,
+            "limit": limit,
             "haberler": haberler,
         })
 
@@ -252,7 +267,23 @@ def ilceler():
 
 @api_bp.route("/temizle", methods=["POST"])
 def veritabani_temizle():
-    """Veritabanını temizler (geliştirme amaçlı)."""
+    """Veritabanını temizler. Admin API anahtarı gerektirir."""
+    # Authorization: Bearer <ADMIN_API_KEY> veya ?api_key=<ADMIN_API_KEY>
+    admin_key = Config.ADMIN_API_KEY
+    if not admin_key:
+        return jsonify({"hata": "ADMIN_API_KEY yapılandırılmamış"}), 503
+
+    gelen_key = None
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        gelen_key = auth_header[7:]
+    else:
+        gelen_key = request.args.get("api_key") or (request.json or {}).get("api_key")
+
+    if gelen_key != admin_key:
+        logger.warning(f"Yetkisiz /api/temizle denemesi: {request.remote_addr}")
+        return jsonify({"hata": "Yetkisiz erişim"}), 401
+
     try:
         db = get_db()
         if not db:
