@@ -3,7 +3,7 @@ Kocaeli Haber Haritası - Temel Scraper Sınıfı
 
 Tüm haber sitesi scraper'larının miras aldığı soyut temel sınıf.
 Her haber sitesi için ortak işlevsellik sağlar.
-Cloudflare korumalı siteler için Selenium desteği içerir.
+Cloudflare korumalı siteler için Playwright (headless) desteği içerir.
 """
 
 import requests
@@ -17,63 +17,63 @@ from config.settings import Config
 
 logger = logging.getLogger(__name__)
 
-# Selenium driver'ı tüm Cloudflare scraper'lar arasında paylaşılır (singleton)
-_selenium_driver = None
+# Playwright browser ve context singleton
+_playwright_instance = None
+_playwright_browser = None
+_playwright_basarisiz = False
 
 
-def _selenium_driver_olustur():
-    """Selenium WebDriver oluşturur (singleton)."""
-    global _selenium_driver
-    if _selenium_driver is not None:
+def _playwright_browser_olustur():
+    """Playwright Chromium browser başlatır (headless singleton)."""
+    global _playwright_instance, _playwright_browser, _playwright_basarisiz
+
+    if _playwright_basarisiz:
+        return None
+
+    if _playwright_browser is not None:
         try:
-            _selenium_driver.title  # Bağlantı hala aktif mi?
-            return _selenium_driver
+            # Browser hala açık mı kontrol et
+            _playwright_browser.contexts
+            return _playwright_browser
         except Exception:
-            _selenium_driver = None
+            _playwright_browser = None
 
     try:
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options
-        from selenium.webdriver.chrome.service import Service
-        from webdriver_manager.chrome import ChromeDriverManager
+        from playwright.sync_api import sync_playwright
 
-        options = Options()
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option("useAutomationExtension", False)
-        options.add_argument(
-            "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+        _playwright_instance = sync_playwright().start()
+        _playwright_browser = _playwright_instance.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
-        options.add_argument("--window-position=-2400,-2400")
-
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-        driver.execute_cdp_cmd(
-            "Page.addScriptToEvaluateOnNewDocument",
-            {"source": 'Object.defineProperty(navigator, "webdriver", {get: () => undefined})'},
-        )
-        driver.set_page_load_timeout(30)
-
-        _selenium_driver = driver
-        logger.info("Selenium WebDriver başlatıldı (Cloudflare bypass).")
-        return driver
+        logger.info("Playwright Chromium başlatıldı (headless).")
+        return _playwright_browser
     except Exception as e:
-        logger.error(f"Selenium başlatma hatası: {e}")
+        logger.error(f"Playwright başlatma hatası: {e}")
+        _playwright_basarisiz = True
         return None
 
 
 def selenium_driver_kapat():
-    """Selenium driver'ı kapatır."""
-    global _selenium_driver
-    if _selenium_driver is not None:
+    """Playwright browser'ı kapatır (eski isim uyumluluğu için)."""
+    global _playwright_instance, _playwright_browser, _playwright_basarisiz
+    if _playwright_browser is not None:
         try:
-            _selenium_driver.quit()
+            _playwright_browser.close()
         except Exception:
             pass
-        _selenium_driver = None
+        _playwright_browser = None
+    if _playwright_instance is not None:
+        try:
+            _playwright_instance.stop()
+        except Exception:
+            pass
+        _playwright_instance = None
+    _playwright_basarisiz = False
 
 
 class BaseScraper(ABC):
@@ -110,7 +110,7 @@ class BaseScraper(ABC):
     def sayfa_getir(self, url: str) -> BeautifulSoup:
         """
         Verilen URL'den HTML içeriğini çeker ve BeautifulSoup nesnesi döndürür.
-        Cloudflare korumalı siteler için otomatik olarak Selenium kullanır.
+        Cloudflare korumalı siteler için otomatik olarak Playwright kullanır.
 
         Args:
             url: Çekilecek sayfa URL'si
@@ -119,7 +119,7 @@ class BaseScraper(ABC):
             BeautifulSoup: Ayrıştırılmış HTML nesnesi veya None
         """
         if self.CLOUDFLARE_KORUMALI:
-            return self._sayfa_getir_selenium(url)
+            return self._sayfa_getir_playwright(url)
         return self._sayfa_getir_requests(url)
 
     def _sayfa_getir_requests(self, url: str) -> BeautifulSoup:
@@ -151,28 +151,36 @@ class BaseScraper(ABC):
 
         return None
 
-    def _sayfa_getir_selenium(self, url: str) -> BeautifulSoup:
-        """Selenium WebDriver ile sayfa çeker (Cloudflare bypass)."""
-        driver = _selenium_driver_olustur()
-        if not driver:
-            logger.error(f"Selenium kullanılamıyor, requests ile deneniyor: {url}")
+    def _sayfa_getir_playwright(self, url: str) -> BeautifulSoup:
+        """Playwright ile sayfa çeker (headless Cloudflare bypass)."""
+        browser = _playwright_browser_olustur()
+        if not browser:
+            logger.warning(f"Playwright kullanılamıyor, requests ile deneniyor: {url}")
             return self._sayfa_getir_requests(url)
 
         try:
             if self.gecikme > 0:
                 time.sleep(self.gecikme)
 
-            driver.get(url)
-            # Cloudflare challenge'ın çözülmesi için bekle
-            time.sleep(3)
+            page = browser.new_page(
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/131.0.0.0 Safari/537.36"
+                ),
+            )
+            page.goto(url, timeout=30000, wait_until="domcontentloaded")
+            # Cloudflare challenge için kısa bekleme
+            page.wait_for_timeout(2000)
 
-            # Sayfa yüklendiyse parse et
-            html = driver.page_source
+            html = page.content()
+            page.close()
+
             if html and len(html) > 1000:
                 return BeautifulSoup(html, "lxml")
 
         except Exception as e:
-            logger.error(f"Selenium sayfa çekme hatası: {url} - {e}")
+            logger.error(f"Playwright sayfa çekme hatası: {url} - {e}")
 
         return None
 
@@ -193,7 +201,9 @@ class BaseScraper(ABC):
         if tarih is None:
             return False
 
-        sinir_tarih = datetime.now() - timedelta(days=gun)
+        sinir_tarih = (
+            datetime.now() - timedelta(days=gun - 1)
+        ).replace(hour=0, minute=0, second=0, microsecond=0)
         return tarih >= sinir_tarih
 
     def tarih_ayristir(self, tarih_metni: str) -> datetime:
@@ -397,7 +407,7 @@ class BaseScraper(ABC):
 
             max_workers = max(1, int(getattr(Config, "SCRAPER_MAX_WORKERS", 8)))
 
-            # Cloudflare korumalı siteler Selenium kullandığı için seri çalışmalı
+            # Cloudflare korumalı siteler Playwright kullandığı için seri çalışmalı
             if self.CLOUDFLARE_KORUMALI or max_workers == 1 or len(haber_linkleri) < 6:
                 for link in haber_linkleri:
                     sonuc = _tek_haber_cek(link)

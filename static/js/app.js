@@ -29,7 +29,22 @@ function initMap() {
             position: google.maps.ControlPosition.RIGHT_CENTER
         },
         styles: [
-            { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }
+            { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
+            { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
+            { elementType: 'labels.text.fill', stylers: [{ color: '#8899aa' }] },
+            { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#2a3a50' }] },
+            { featureType: 'administrative.land_parcel', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+            { featureType: 'landscape', elementType: 'geometry.fill', stylers: [{ color: '#162033' }] },
+            { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#1e2d42' }] },
+            { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+            { featureType: 'poi.park', elementType: 'geometry.fill', stylers: [{ color: '#1a3328' }] },
+            { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#253347' }] },
+            { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1a2332' }] },
+            { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2d4a6f' }] },
+            { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1a2332' }] },
+            { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e2d42' }] },
+            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1a2b' }] },
+            { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3d5a80' }] },
         ]
     });
 
@@ -90,6 +105,14 @@ function markerIkonlariniHazirla() {
         // Elektrik Kesintisi — koyu badge, sarı şimşek
         elektrik_kesintisi: pinSvgOlustur('#1e293b',
             `<polygon points="22,8 16,17.5 19,17.5 16,26 24,15.5 20.5,15.5 22.5,8" fill="#FACC15"/>`),
+
+        // Asayiş — koyu kırmızı badge, beyaz ünlem/siren ikonu
+        asayis: pinSvgOlustur('#B91C1C',
+            `<g fill="#fff" transform="translate(20,18)">
+                <path d="M0,-8 L-6,4 L6,4 Z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+                <line x1="0" y1="-4" x2="0" y2="1" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+                <circle cx="0" cy="3.5" r="1.2" fill="#fff"/>
+            </g>`),
 
         // Hırsızlık — mor badge, beyaz gözlük/maske ikonu
         hirsizlik: pinSvgOlustur('#7C3AED',
@@ -347,11 +370,11 @@ function infoWindowAc(marker, haber) {
     }
 
     const icerik = `
-        <div style="font-family:'Inter',sans-serif;max-width:330px;padding:4px;">
-            <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:10px;line-height:1.45;letter-spacing:-0.2px;">
+        <div style="font-family:'Inter',sans-serif;max-width:330px;padding:4px;background:#151f30;">
+            <div style="font-size:15px;font-weight:700;color:#e2e8f0;margin-bottom:10px;line-height:1.45;letter-spacing:-0.2px;">
                 ${escapeHtml(haber.baslik)}
             </div>
-            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:12.5px;color:#475569;">
+            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:12.5px;color:#94a3b8;">
                 <span style="display:inline-block;padding:4px 12px;border-radius:8px;color:#fff;font-size:11.5px;font-weight:700;background:linear-gradient(135deg,${turBilgi.color},${turBilgi.color}dd);width:fit-content;letter-spacing:0.3px;box-shadow:0 2px 6px ${turBilgi.color}44;">
                     ${turBilgi.icon} ${turBilgi.label}
                 </span>
@@ -359,7 +382,7 @@ function infoWindowAc(marker, haber) {
                 <span>📍 ${escapeHtml(konumMetni)}</span>
                 ${kaynakSayisi > 1 ? `<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;">📡 ${kaynakSayisi} kaynakta</span>` : ''}
             </div>
-            ${icerikOzet ? `<div style="font-size:12.5px;color:#64748b;line-height:1.55;margin-bottom:12px;padding:8px 10px;background:#f8fafc;border-radius:8px;border-left:3px solid ${turBilgi.color};">${escapeHtml(icerikOzet)}</div>` : ''}
+            ${icerikOzet ? `<div style="font-size:12.5px;color:#94a3b8;line-height:1.55;margin-bottom:12px;padding:8px 10px;background:#1a2740;border-radius:8px;border-left:3px solid ${turBilgi.color};">${escapeHtml(icerikOzet)}</div>` : ''}
             ${kaynakLinksHtml}
         </div>
     `;
@@ -412,7 +435,7 @@ function filtreleriTemizle() {
 // ==================== SANAL LİSTE (VIRTUAL SCROLL) ====================
 // Binlerce haberi DOM'a eklemek yerine sadece görünür olanları render eder.
 
-const KART_YUKSEKLIGI = 90; // px — ortalama kart yüksekliği
+const KART_YUKSEKLIGI = 78; // px — ortalama kart yüksekliği
 let _virtualListesi = [];
 let _scrollHandler = null;
 
