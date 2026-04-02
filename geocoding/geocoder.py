@@ -30,30 +30,30 @@ class Geocoder:
         "max_boylam": 30.30,
     }
 
-    # Kocaeli ilçe merkez koordinatları (Google API kullanılamadığında fallback)
+    # Kocaeli ilçe merkez koordinatları (karada, yerleşim alanı üzerinde)
     ILCE_KOORDINATLARI = {
         "İzmit": {"enlem": 40.7654, "boylam": 29.9408},
-        "Gebze": {"enlem": 40.8027, "boylam": 29.4307},
-        "Darıca": {"enlem": 40.7690, "boylam": 29.3753},
-        "Gölcük": {"enlem": 40.7167, "boylam": 29.8333},
+        "Gebze": {"enlem": 40.7927, "boylam": 29.4370},
+        "Darıca": {"enlem": 40.7590, "boylam": 29.3780},
+        "Gölcük": {"enlem": 40.6950, "boylam": 29.8200},
         "Kandıra": {"enlem": 41.0714, "boylam": 30.1522},
-        "Karamürsel": {"enlem": 40.6917, "boylam": 29.6167},
-        "Körfez": {"enlem": 40.7239, "boylam": 29.7644},
-        "Derince": {"enlem": 40.7550, "boylam": 29.8150},
-        "Başiskele": {"enlem": 40.7167, "boylam": 29.9833},
+        "Karamürsel": {"enlem": 40.6850, "boylam": 29.6200},
+        "Körfez": {"enlem": 40.7100, "boylam": 29.7600},
+        "Derince": {"enlem": 40.7480, "boylam": 29.8200},
+        "Başiskele": {"enlem": 40.7100, "boylam": 29.9900},
         "Çayırova": {"enlem": 40.8261, "boylam": 29.3731},
         "Dilovası": {"enlem": 40.7833, "boylam": 29.5333},
         "Kartepe": {"enlem": 40.6833, "boylam": 30.0500},
         # Küçük yazım varyantları
         "izmit": {"enlem": 40.7654, "boylam": 29.9408},
-        "gebze": {"enlem": 40.8027, "boylam": 29.4307},
-        "darıca": {"enlem": 40.7690, "boylam": 29.3753},
-        "gölcük": {"enlem": 40.7167, "boylam": 29.8333},
+        "gebze": {"enlem": 40.7927, "boylam": 29.4370},
+        "darıca": {"enlem": 40.7590, "boylam": 29.3780},
+        "gölcük": {"enlem": 40.6950, "boylam": 29.8200},
         "kandıra": {"enlem": 41.0714, "boylam": 30.1522},
-        "karamürsel": {"enlem": 40.6917, "boylam": 29.6167},
-        "körfez": {"enlem": 40.7239, "boylam": 29.7644},
-        "derince": {"enlem": 40.7550, "boylam": 29.8150},
-        "başiskele": {"enlem": 40.7167, "boylam": 29.9833},
+        "karamürsel": {"enlem": 40.6850, "boylam": 29.6200},
+        "körfez": {"enlem": 40.7100, "boylam": 29.7600},
+        "derince": {"enlem": 40.7480, "boylam": 29.8200},
+        "başiskele": {"enlem": 40.7100, "boylam": 29.9900},
         "çayırova": {"enlem": 40.8261, "boylam": 29.3731},
         "dilovası": {"enlem": 40.7833, "boylam": 29.5333},
         "kartepe": {"enlem": 40.6833, "boylam": 30.0500},
@@ -163,6 +163,10 @@ class Geocoder:
                 sorgu,
                 language="tr",
                 region="tr",
+                bounds={
+                    "southwest": {"lat": 40.45, "lng": 29.20},
+                    "northeast": {"lat": 41.10, "lng": 30.30},
+                },
             )
 
             if not sonuc:

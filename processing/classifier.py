@@ -6,16 +6,17 @@ Haber içeriklerini analiz ederek anahtar kelime tabanlı
 sınıflandırma yapar. Her haber yalnızca bir türle etiketlenir.
 
 
-Haber Türleri (PDF zorunlu 5 tür):
+Haber Türleri (6 tür):
 1. Trafik Kazası
 2. Yangın
 3. Elektrik Kesintisi
-4. Hırsızlık
-5. Kültürel Etkinlikler
+4. Asayiş (Cinayet, Yaralama, Saldırı)
+5. Hırsızlık
+6. Kültürel Etkinlikler
 
 
 Öncelik Sırası (birden fazla kategoriye giriyorsa):
-Trafik Kazası > Yangın > Elektrik Kesintisi > Hırsızlık > Kültürel Etkinlikler
+Trafik Kazası > Yangın > Asayiş > Elektrik Kesintisi > Hırsızlık > Kültürel Etkinlikler
 """
 
 
@@ -132,20 +133,44 @@ class NewsClassifier:
                "enerji kesintisi", "planlı kesinti", "sedaş",
            ],
        },
+       "asayis": {
+           "oncelik": 3.5,
+           "anahtar_kelimeler": [
+               "cinayet", "öldürme", "öldürdü", "öldürüldü", "öldürmüş",
+               "bıçaklama", "bıçakladı", "bıçaklandı", "bıçaklı saldırı",
+               "bıçak darbesi", "bıçakla yaraladı",
+               "silahlı saldırı", "silahla vurdu", "silahla yaraladı",
+               "ateş açtı", "ateş açıldı", "silahlı çatışma",
+               "yaralama", "yaraladı", "yaralandı", "yaralı",
+               "darp", "darp etti", "dövdü", "dövüldü", "dayak",
+               "kavga", "kavgada", "kavgası",
+               "saldırı", "saldırdı", "saldırıda",
+               "infaz", "pusu", "pusu kurdu",
+               "ceset", "cansız beden", "cansız bedeni",
+               "hayatını kaybetti", "hayatını kaybeden",
+               "can verdi", "olay yerinde öldü",
+               "tutuklandı", "gözaltına alındı", "gözaltı",
+               "cinayetle", "cinayette",
+           ],
+           "guclu_anahtar_kelimeler": [
+               "cinayet", "öldürdü", "öldürüldü", "bıçakladı",
+               "bıçaklandı", "silahlı saldırı", "ateş açtı",
+               "bıçaklı saldırı", "pusu",
+           ],
+       },
        "hirsizlik": {
            "oncelik": 4,
            "anahtar_kelimeler": [
                "hırsızlık", "hırsız", "çalındı", "çaldı", "çalınan",
                "soygun", "soyuldu", "gasp", "gaspçı", "dolandırıcılık",
                "dolandırıcı", "kapkaç", "kapkaççı",
-               "cinayet", "silahlı saldırı", "bıçaklı saldırı",
                "kaçak üretim", "uyuşturucu",
                "hırsızlık şüphelisi", "hırsızlık olayı",
                "eve girdi", "iş yerine girdi", "dükkana girdi",
            ],
            "guclu_anahtar_kelimeler": [
                "hırsızlık", "hırsız", "soygun", "gasp", "kapkaç",
-               "cinayet", "dolandırıcılık", "uyuşturucu",
+               "dolandırıcılık", "uyuşturucu",
            ],
        },
        "kulturel_etkinlik": {

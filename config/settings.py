@@ -70,7 +70,7 @@ class Config:
         },
     }
 
-    # Haber Türleri ve Renkleri (PDF zorunlu 5 tür)
+    # Haber Türleri ve Renkleri
     NEWS_TYPES = {
         "trafik_kazasi": {
             "label": "Trafik Kazası",
@@ -90,6 +90,12 @@ class Config:
             "icon": "⚡",
             "marker_color": "yellow",
         },
+        "asayis": {
+            "label": "Asayiş",
+            "color": "#B91C1C",
+            "icon": "🚨",
+            "marker_color": "darkred",
+        },
         "hirsizlik": {
             "label": "Hırsızlık",
             "color": "#7C3AED",
@@ -105,7 +111,7 @@ class Config:
     }
 
     # Benzerlik Eşik Değeri
-    SIMILARITY_THRESHOLD = 0.90
+    SIMILARITY_THRESHOLD = 0.82
 
     # Kocaeli İlçeleri
     KOCAELI_DISTRICTS = [

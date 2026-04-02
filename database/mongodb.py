@@ -409,8 +409,11 @@ class MongoDB:
             if tarih_filtre:
                 filtre["yayin_tarihi"] = tarih_filtre
         else:
-            # Varsayılan: sadece son 3 günlük haberler (tarihsiz haberler dahil edilmez)
-            varsayilan_baslangic = datetime.now() - timedelta(days=Config.SCRAPING_DAYS)
+            # Varsayılan: sadece son 3 günlük haberler (gün başlangıcından itibaren)
+            # Örn: bugün 2 Nisan, SCRAPING_DAYS=3 → 31 Mart 00:00'dan itibaren göster
+            varsayilan_baslangic = (
+                datetime.now() - timedelta(days=Config.SCRAPING_DAYS - 1)
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
             filtre["yayin_tarihi"] = {"$gte": varsayilan_baslangic}
 
         # Sadece geçerli 5 haber türünü göster (haber_turu filtresi yoksa)
@@ -436,7 +439,9 @@ class MongoDB:
         if gun is None:
             gun = Config.SCRAPING_DAYS
 
-        sinir_tarih = datetime.now() - timedelta(days=gun)
+        sinir_tarih = (
+            datetime.now() - timedelta(days=gun - 1)
+        ).replace(hour=0, minute=0, second=0, microsecond=0)
 
         try:
             # Silinecek haberlerin linklerini al (embedding temizliği için)
