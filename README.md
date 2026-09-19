@@ -105,7 +105,7 @@ Uygulama varsayılan olarak `http://localhost:5000` adresinde çalışacaktır.
 ## 📁 Proje Yapısı
 
 ```
-kocaeli-haber-harita/
+kocaeli-haber-haritasi/
 ├── app.py                    # Ana uygulama dosyası
 ├── config/
 │   ├── __init__.py
