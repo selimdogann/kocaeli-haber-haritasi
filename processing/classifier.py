@@ -19,7 +19,10 @@ Nasıl karar verilir:
    haberi yanlış türe sokamaz.
 2. Skor: Aday türler için başlık + tüm metin üzerinden puan toplanır
    (zayıf kelime +1, güçlü kelime +6, başlıkta eşleşme ek puan).
-3. En yüksek skorlu tür seçilir; eşitlikte öncelik sırası belirler:
+3. Başlık önceliği: Güçlü kelimesi BAŞLIKTA geçen bir aday tür varsa seçim
+   sadece bu türler arasında yapılır. Başlık haberin konusunu söyler; metinde
+   yan bilgi olarak geçen kelime ("kavga ihbarına giden polis") onu ezemez.
+4. En yüksek skorlu tür seçilir; eşitlikte öncelik sırası belirler:
    Trafik Kazası > Yangın > Elektrik Kesintisi > Asayiş > Hırsızlık > Kültürel
 """
 
@@ -79,10 +82,14 @@ class NewsClassifier:
                 "trafik kazası", "kaza", "feci kaza", "zincirleme kaza",
                 "çarpıştı", "çarpışma", "takla attı", "devrildi",
                 "yoldan çıktı", "şarampole", "refüje çıktı", "yayaya çarptı",
-                "kafa kafaya",
+                "kafa kafaya", "çarptı",
+            ],
+            # "Elektrik çarptı", "yıldırım çarptı" trafik kazası değildir
+            "haric_ifadeler": [
+                "elektrik çarp", "elektrik akımına kapıl", "yıldırım çarp", "akım çarp",
             ],
             "anahtar_kelimeler": [
-                "çarptı", "savruldu", "yaralandı", "ağır yaralı",
+                "savruldu", "yaralandı", "ağır yaralı",
                 "hayatını kaybetti", "ambulans", "olay yerinde",
                 "altında kaldı",
             ],
@@ -231,6 +238,7 @@ class NewsClassifier:
         tum_metin = f"{baslik_k} {icerik_k}"
 
         skorlar = {}
+        baslikta_guclu = set()   # güçlü kelimesi başlıkta geçen türler
         for tur, kaliplar in self.derli_kaliplar.items():
             # Hariç ifadeler bu tür için metinden çıkarılır
             # ("yangın söndürme tankeri" → yangın olayı sayılmaz)
@@ -245,6 +253,9 @@ class NewsClassifier:
             if self._say(kaliplar["guclu"], kapi_metni) == 0:
                 skorlar[tur] = 0
                 continue
+
+            if self._say(kaliplar["guclu"], t_baslik) > 0:
+                baslikta_guclu.add(tur)
 
             skor = 0
             skor += self._say(kaliplar["anahtar"], t_tum)
@@ -261,7 +272,10 @@ class NewsClassifier:
         if max_skor == 0:
             return {"haber_turu": None, "guven_skoru": 0.0, "tum_skorlar": skorlar}
 
-        en_yuksekler = [t for t, s in skorlar.items() if s == max_skor]
+        # Başlık önceliği: başlıkta güçlü kelimesi olan aday varsa onlar yarışır
+        yarisanlar = {t: s for t, s in skorlar.items() if s > 0 and t in baslikta_guclu} or skorlar
+        max_skor = max(yarisanlar.values())
+        en_yuksekler = [t for t, s in yarisanlar.items() if s == max_skor]
         secilen = min(en_yuksekler, key=lambda t: self.derli_kaliplar[t]["oncelik"])
 
         guven = skorlar[secilen] / sum(skorlar.values())

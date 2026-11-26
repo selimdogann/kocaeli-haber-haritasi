@@ -164,3 +164,25 @@ def test_haric_ifade_gercek_olayi_engellemez(siniflandirici):
                "Geçen ay yangın tatbikatı yapılan fabrikada bu sabah yangın çıktı.") == "yangin"
     # Tekil "kadın cinayeti" bir olay haberidir
     assert tur(siniflandirici, "Gölcük'te kadın cinayeti", "Eşini öldüren şüpheli tutuklandı.") == "asayis"
+
+
+# ------------------------------------------------------------ başlık önceliği
+def test_baslik_konusu_metindeki_yan_bilgiyi_ezer(siniflandirici):
+    # Metinde "kavga ihbarı" geçiyor ama haber bir trafik kazası
+    assert tur(siniflandirici, "Alkollü sürücü polis aracına çarptı: 2 yaralı",
+               "Ehliyetsiz sürücünün kullandığı otomobil, kavga ihbarına giden polis "
+               "otosuna çarptı. Kazada bir polis memuru yaralandı.") == "trafik_kazasi"
+
+
+def test_baslikta_suc_varsa_asayis_kalir(siniflandirici):
+    # Başlıkta asayiş var, metinde araç geçiyor → asayiş
+    assert tur(siniflandirici, "Tartıştığı kişiyi bıçakla yaraladı",
+               "Şüpheli olaydan sonra otomobiliyle kaçtı, polis kaza yerinde değil evinde yakaladı.") == "asayis"
+
+
+@pytest.mark.parametrize("baslik, icerik", [
+    ("Elektrik çarpan işçi hastaneye kaldırıldı", "İnşaatta çalışan işçiyi elektrik çarptı, araçla hastaneye götürüldü."),
+    ("Tarlada yıldırım çarptı", "Traktörün yanında duran çiftçiye yıldırım çarptı."),
+])
+def test_elektrik_yildirim_carpmasi_trafik_degil(siniflandirici, baslik, icerik):
+    assert tur(siniflandirici, baslik, icerik) != "trafik_kazasi"
