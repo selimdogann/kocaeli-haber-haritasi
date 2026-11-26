@@ -137,22 +137,16 @@ def haberleri_getir():
             limit = 200
         skip = (sayfa - 1) * limit
 
-        if sadece_konumlu:
-            haberler = db.haberleri_filtrele(
-                haber_turu=haber_turu,
-                ilce=ilce,
-                baslangic_tarihi=baslangic_tarihi,
-                bitis_tarihi=bitis_tarihi,
-                limit=limit,
-                skip=skip,
-            )
-        else:
-            filtre = {}
-            if haber_turu:
-                filtre["haber_turu"] = haber_turu
-            if ilce:
-                filtre["konum_metni"] = {"$regex": ilce, "$options": "i"}
-            haberler = db.tum_haberleri_getir(filtre, limit=limit, skip=skip)
+        # Konumsuzlar dahil liste (tablo görünümü) de aynı filtreleri kullanır
+        haberler = db.haberleri_filtrele(
+            haber_turu=haber_turu,
+            ilce=ilce,
+            baslangic_tarihi=baslangic_tarihi,
+            bitis_tarihi=bitis_tarihi,
+            limit=limit,
+            skip=skip,
+            sadece_konumlu=sadece_konumlu,
+        )
 
         # Haberleri frontend formatına dönüştür
         haberler = [_haber_formatla(h) for h in haberler]
@@ -173,14 +167,20 @@ def haberleri_getir():
 @api_bp.route("/haberler/<haber_id>", methods=["GET"])
 def haber_detay(haber_id):
     """Tek bir haberin detayını döndürür."""
-    try:
-        from bson import ObjectId
+    from bson import ObjectId
+    from bson.errors import InvalidId
 
+    try:
+        nesne_id = ObjectId(haber_id)
+    except (InvalidId, TypeError):
+        return jsonify({"hata": "Haber bulunamadı"}), 404
+
+    try:
         db = get_db()
         if not db:
             return jsonify({"hata": "Veritabanı bağlantı hatası"}), 500
 
-        haber = db.news_collection.find_one({"_id": ObjectId(haber_id)})
+        haber = db.news_collection.find_one({"_id": nesne_id})
         if not haber:
             return jsonify({"hata": "Haber bulunamadı"}), 404
 
@@ -278,7 +278,7 @@ def veritabani_temizle():
     if auth_header.startswith("Bearer "):
         gelen_key = auth_header[7:]
     else:
-        gelen_key = request.args.get("api_key") or (request.json or {}).get("api_key")
+        gelen_key = request.args.get("api_key") or (request.get_json(silent=True) or {}).get("api_key")
 
     if gelen_key != admin_key:
         logger.warning(f"Yetkisiz /api/temizle denemesi: {request.remote_addr}")

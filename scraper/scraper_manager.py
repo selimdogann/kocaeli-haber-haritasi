@@ -6,6 +6,7 @@ temizler, sınıflandırır, konumlarını çıkarır ve veritabanına kaydeder.
 """
 
 import logging
+from urllib.parse import urlparse
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -83,6 +84,24 @@ class ScraperManager:
         if self._benzerlik_analizoru is None:
             self._benzerlik_analizoru = SimilarityAnalyzer()
         return self._benzerlik_analizoru
+
+    @staticmethod
+    def _site_alani(link: str) -> str:
+        """https://www.ozgurkocaeli.com.tr/haber/1/x → ozgurkocaeli.com.tr"""
+        alan = urlparse(link or "").netloc.lower()
+        return alan[4:] if alan.startswith("www.") else alan
+
+    @classmethod
+    def birlestirilecek_benzer(cls, haber: dict, benzerler: list):
+        """
+        Benzerlik sırasına göre, yeni haberle FARKLI sitedeki ilk benzeri döndürür.
+        Uygun benzer yoksa None (haber kendi kaydıyla saklanır).
+        """
+        yeni_site = cls._site_alani(haber.get("haber_linki"))
+        for benzer in benzerler or []:
+            if cls._site_alani(benzer["haber"].get("haber_linki")) != yeni_site:
+                return benzer
+        return None
 
     def tum_kaynaklardan_cek(self) -> dict:
         """
@@ -174,12 +193,16 @@ class ScraperManager:
                 scrape_progress["kaynak_no"] = idx + 1
                 scrape_progress["yuzde"] = int((idx / len(self.scraperlar)) * 50)
                 logger.info(f"🔄 {scraper.kaynak_adi} haberleri çekiliyor...")
-                haberler = scraper.tum_haberleri_cek()
+                haberler = scraper.tum_haberleri_cek(
+                    atlanacak_linkler=self._mevcut_linkler_cache
+                )
                 tum_haberler.extend(haberler)
 
                 rapor["kaynak_detay"][scraper.kaynak_adi] = {
                     "cekilen": len(haberler),
                     "kaydedilen": 0,
+                    # "engellendi": site bot korumasıyla erişimi reddetti
+                    "erisim": "engellendi" if getattr(scraper, "engellendi", False) else "tamam",
                 }
                 rapor["toplam_cekilen"] += len(haberler)
 
@@ -321,8 +344,10 @@ class ScraperManager:
                 yeni_embedding=yeni_embedding,
             )
 
-            if benzerler:
-                en_benzer = benzerler[0]
+            # Sadece FARKLI sitedeki aynı haber birleştirilir. Aynı sitenin
+            # benzer haberi (olayın devam haberi) ayrı bir haber olarak kalır.
+            en_benzer = self.birlestirilecek_benzer(haber, benzerler)
+            if en_benzer:
                 self.db.haber_kaynak_ekle(
                     en_benzer["haber"]["haber_linki"],
                     {

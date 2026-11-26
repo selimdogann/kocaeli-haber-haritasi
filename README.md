@@ -11,6 +11,14 @@ Yazılım Laboratuvarı-II | Proje I
 
 Bu proje, Kocaeli yerel haber sitelerinden belirlenen haber türlerine ait haberlerin web ortamından otomatik olarak toplanmasını, işlenmesini ve Google Maps üzerinde görselleştirilmesini sağlayan bir sistemdir.
 
+## 📸 Ekran Görüntüleri
+
+![Harita ve haber detayı](docs/ekran-goruntuleri/harita.png)
+
+| Tüm haberler tablosu | Telefon |
+|---|---|
+| ![Tablo](docs/ekran-goruntuleri/tablo.png) | <img src="docs/ekran-goruntuleri/mobil.png" width="280" alt="Telefon görünümü"> |
+
 ## 🏗️ Mimari
 
 ```
@@ -49,19 +57,24 @@ Bu proje, Kocaeli yerel haber sitelerinden belirlenen haber türlerine ait haber
 
 ## 📂 Haber Türleri
 
-| Simge | Haber Türü | Marker Rengi |
-|-------|-----------|--------------|
-| 🚗 | Trafik Kazası | Kırmızı |
-| 🔥 | Yangın | Turuncu |
-| ⚡ | Elektrik Kesintisi | Koyu Lacivert |
-| 🔒 | Hırsızlık | Mor |
-| 🕊️ | Vefat | Koyu Gri |
-| 🩺 | Sağlık | Yeşil |
-| 🎓 | Eğitim | Turkuaz |
-| ⚽ | Spor | Yeşil |
-| 🏛️ | Yerel Yönetim | Mor-Mavi |
-| 🎭 | Kültürel Etkinlikler | Mavi |
-| 📰 | Diğer | Gri |
+| Haber Türü | Pin Rengi |
+|-----------|-----------|
+| Trafik Kazası | Kırmızı `#F2555A` |
+| Yangın | Turuncu `#F7934C` |
+| Elektrik Kesintisi | Sarı `#F2C94C` |
+| Asayiş | Pembe `#EC6FB0` |
+| Hırsızlık | Turkuaz `#4FD1C5` |
+| Kültürel Etkinlikler | Yeşil `#7BD88F` |
+
+Her türün haritada kendi ikonu da var; tür sadece renge bağlı değil.
+
+## 🎨 Arayüz
+
+- Solda filtre paneli: tür chip'leri (filtre + lejant + dağılım tek yerde), ilçe, hızlı tarih (Bugün / 3 gün / 7 gün), başlıkta arama, sanal kaydırmalı haber listesi
+- Sağda koyu temalı Google Maps; aynı konumdaki haberler çember üzerine dağıtılır
+- "Tablo" ile konumu bulunamayanlar dahil tüm haberler
+- Telefonda panel alttan açılan sheet olur
+- Klavye ile kullanılabilir, `prefers-reduced-motion` destekli
 
 ## 🚀 Kurulum
 
@@ -73,7 +86,7 @@ cd kocaeli-haber-haritasi
 
 ### 2. Sanal Ortam Oluşturun
 ```bash
-python3 -m venv venv
+python3.12 -m venv venv  # Python 3.12 ile test edildi
 source venv/bin/activate  # macOS/Linux
 # venv\Scripts\activate   # Windows
 ```
@@ -91,8 +104,8 @@ cp .env.example .env
 
 ### 5. MongoDB'yi Başlatın
 ```bash
-# MongoDB'nin çalıştığından emin olun
-mongod --dbpath data/db
+# Docker ile (önerilen)
+docker run -d --name kocaeli-haber-mongo -p 27017:27017 -v kocaeli-haber-mongo:/data/db mongo:7
 ```
 
 ### 6. Uygulamayı Başlatın
@@ -100,7 +113,27 @@ mongod --dbpath data/db
 python app.py
 ```
 
-Uygulama varsayılan olarak `http://localhost:5000` adresinde çalışacaktır.
+Uygulama `.env` içindeki `FLASK_PORT` ile çalışır (varsayılan `http://localhost:5001`; macOS'ta 5000 portunu AirPlay kullanır).
+
+Harita için `.env` dosyasına `GOOGLE_MAPS_API_KEY` girilmelidir. Anahtar yoksa liste ve filtreler çalışır, harita alanında uyarı görünür.
+
+## 🧪 Testler
+
+```bash
+pip install -r requirements-dev.txt
+pytest                 # internetsiz testler (sınıflandırma, scraper ayrıştırma, konum, API)
+pytest --canli         # + 5 haber sitesine gerçekten bağlanan testler
+```
+
+- API testleri ayrı bir `kocaeli_haber_test` veritabanı kullanır; MongoDB çalışmıyorsa atlanır.
+- Canlı testler her kaynaktan link toplanabildiğini, başlık/içerik/tarih çıkarıldığını ve linkin doğru habere gittiğini kontrol eder.
+
+## ⚠️ Scraping notları
+
+- Haber siteleri Cloudflare bot koruması kullanıyor. Kısa sürede çok istek atılırsa IP geçici olarak engellenir.
+- Bu yüzden varsayılanlar kibar tutuldu: kaynak başına 2 paralel istek, istekler arası 1 sn (`SCRAPER_MAX_WORKERS`, `REQUEST_DELAY`).
+- Veritabanında zaten olan haberlerin sayfası tekrar indirilmez.
+- Bir site engellerse o kaynak o çalıştırmada atlanır ve arayüzde bildirim çıkar.
 
 ## 📁 Proje Yapısı
 
