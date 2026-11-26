@@ -336,7 +336,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
 }
 .map-empty[hidden] { display: none; }
 .map-empty .i { width: 40px; height: 40px; color: var(--faint); stroke-width: 1.4; margin-bottom: var(--s-2); }
-.map-empty h2 { font-size: var(--fs-xl); font-weight: 600; color: var(--ink); }
+.map-empty h2 { font-size: var(--fs-lg); font-weight: 600; color: var(--ink); }
 .map-empty p { max-width: 42ch; }
 .map-empty code { font-size: .92em; padding: 1px 5px; border-radius: 4px; background: var(--surface-2); color: var(--ink); }
 
