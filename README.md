@@ -3,7 +3,7 @@
 **Web Scraping Tabanlı Kentsel Haber İzleme ve Harita Üzerinde Görselleştirme Sistemi**
 
 Kocaeli Üniversitesi - Bilgisayar Mühendisliği Bölümü  
-Yazılım Laboratuvarı-II | Proje I
+Yazılım Laboratuvarı
 
 ---
 
