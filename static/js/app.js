@@ -37,7 +37,7 @@ function svg(icerik, ekSinif = '') {
 }
 
 function turBilgisi(turId) {
-    return CONFIG.newsTypes[turId] || { color: '#9aa4b5', label: 'Diğer' };
+    return CONFIG.newsTypes[turId] || { color: '#5b6472', label: 'Diğer' };
 }
 
 // Chip ikonlarını doldur (Jinja sadece yer tutucu basar)
@@ -72,7 +72,7 @@ function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
         center: { lat: CONFIG.centerLat, lng: CONFIG.centerLng },
         zoom: 11,
-        backgroundColor: '#0c1220',
+        backgroundColor: '#e8ecf1',
         disableDefaultUI: true,
         zoomControl: true,
         zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM },
@@ -88,26 +88,29 @@ function initMap() {
     if (haberler.length) haritayiGuncelle();
 }
 
-// Sakin, düşük kontrastlı gece haritası: pinler tek doygun renk olsun diye.
+// Sakin "kâğıt harita": gri-beyaz kara, yumuşak mavi körfez, soluk etiketler.
+// Pinler sayfadaki tek doygun renk olsun diye harita bilerek renksiz tutulur.
 const HARITA_STILI = [
-    { elementType: 'geometry', stylers: [{ color: '#10151f' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#7d889b' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#0a0d14' }] },
+    { elementType: 'geometry', stylers: [{ color: '#f1f3f6' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#6b7482' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }, { weight: 3 }] },
     { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-    { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#2a3346' }] },
-    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#b4bdcc' }] },
+    { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#c9d0da' }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#2f3640' }] },
     { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
     { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
+    { featureType: 'landscape.man_made', elementType: 'geometry', stylers: [{ color: '#eaedf1' }] },
     { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ visibility: 'on' }, { color: '#121c1c' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1a2131' }] },
+    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ visibility: 'on' }, { color: '#e1ece2' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
     { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'simplified' }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#25304a' }] },
-    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#8592a8' }] },
+    { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#fbfcfd' }] },
+    { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#d5dbe3' }] },
+    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#5b6472' }] },
     { featureType: 'road.local', elementType: 'labels', stylers: [{ visibility: 'off' }] },
     { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0b1a2c' }] },
-    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3b5a7d' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#cadcec' }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#5a7fa3' }] },
 ];
 
 // ==================== MARKER İKONLARI ====================
@@ -125,10 +128,11 @@ function markerIkonu(turId, aktif = false) {
     const w = Math.round(34 * olcek), h = Math.round(44 * olcek);
 
     const kod = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 34 44">
+        <ellipse cx="17" cy="42.6" rx="5" ry="1.4" fill="#14181f" opacity=".18"/>
         <path d="M17 42.5S31.5 27.6 31.5 16.6A14.5 14.5 0 0 0 2.5 16.6C2.5 27.6 17 42.5 17 42.5Z"
-              fill="${renk}" stroke="#0a0d14" stroke-width="2"/>
-        ${aktif ? `<path d="M17 42.5S31.5 27.6 31.5 16.6A14.5 14.5 0 0 0 2.5 16.6C2.5 27.6 17 42.5 17 42.5Z" fill="none" stroke="#e9edf3" stroke-width="1.2" transform="translate(17 22) scale(1.06) translate(-17 -22)"/>` : ''}
-        <g transform="translate(8 7.6) scale(.75)" fill="none" stroke="#0a0d14" stroke-width="2.4"
+              fill="${renk}" stroke="#ffffff" stroke-width="2"/>
+        ${aktif ? `<path d="M17 42.5S31.5 27.6 31.5 16.6A14.5 14.5 0 0 0 2.5 16.6C2.5 27.6 17 42.5 17 42.5Z" fill="none" stroke="#14181f" stroke-width="1.2" transform="translate(17 22) scale(1.06) translate(-17 -22)"/>` : ''}
+        <g transform="translate(8 7.6) scale(.75)" fill="none" stroke="#ffffff" stroke-width="2.4"
            stroke-linecap="round" stroke-linejoin="round">${ikon}</g>
     </svg>`;
 
@@ -200,6 +204,13 @@ async function scrapingBaslat() {
         if (data.basarili) {
             const r = data.rapor;
             bildirimGoster(`Güncellendi: ${r.toplam_kaydedilen} yeni haber eklendi, ${r.toplam_cekilen} haber tarandı (${r.sure_saniye.toFixed(0)} sn).`, 'basarili');
+
+            // Bot korumasıyla erişimi reddeden ya da hiç haber vermeyen kaynakları göster
+            const detay = Object.entries(r.kaynak_detay || {});
+            const engelli = detay.filter(([, d]) => d.erisim === 'engellendi').map(([ad]) => ad);
+            const bos = detay.filter(([, d]) => d.erisim !== 'engellendi' && d.cekilen === 0).map(([ad]) => ad);
+            if (engelli.length) bildirimGoster(`Erişim reddedildi: ${engelli.join(', ')}. Site bot koruması devrede, daha sonra tekrar dene.`, 'uyari');
+            if (bos.length) bildirimGoster(`Haber gelmedi: ${bos.join(', ')}. Son 3 günde yeni haber yok ya da site yapısı değişmiş olabilir.`, 'uyari');
             await Promise.all([haberleriGetir(), istatistikleriGetir()]);
         } else {
             bildirimGoster('Güncelleme yarıda kaldı: ' + (data.hata || data.mesaj || 'bilinmeyen hata'), 'hata');

@@ -180,6 +180,8 @@ class ScraperManager:
                 rapor["kaynak_detay"][scraper.kaynak_adi] = {
                     "cekilen": len(haberler),
                     "kaydedilen": 0,
+                    # "engellendi": site bot korumasıyla erişimi reddetti
+                    "erisim": "engellendi" if getattr(scraper, "engellendi", False) else "tamam",
                 }
                 rapor["toplam_cekilen"] += len(haberler)
 

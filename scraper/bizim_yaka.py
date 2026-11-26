@@ -90,9 +90,7 @@ class BizimYakaScraper(BaseScraper):
             for secici in icerik_seciciler:
                 icerik = soup.select_one(secici)
                 if icerik:
-                    for tag in icerik.find_all(["script", "style", "iframe", "aside"]):
-                        tag.decompose()
-                    metin = icerik.get_text(separator=" ", strip=True)
+                    metin = self.govde_metni(icerik)
                     if len(metin) > 50:
                         haber["icerik"] = metin
                         break

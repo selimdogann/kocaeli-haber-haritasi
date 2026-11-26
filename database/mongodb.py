@@ -10,6 +10,7 @@ from pymongo.errors import DuplicateKeyError, ConnectionFailure
 from datetime import datetime, timedelta
 from config.settings import Config
 import logging
+import re
 import numpy as np
 
 # Loglama yapılandırması
@@ -196,6 +197,7 @@ class MongoDB:
         bitis_tarihi: str = None,
         limit: int = 0,
         skip: int = 0,
+        sadece_konumlu: bool = True,
     ) -> list:
         """
         Haberleri türe, ilçeye ve tarih aralığına göre filtreler.
@@ -216,7 +218,7 @@ class MongoDB:
             ilce=ilce,
             baslangic_tarihi=baslangic_tarihi,
             bitis_tarihi=bitis_tarihi,
-            sadece_konumlu=True,
+            sadece_konumlu=sadece_konumlu,
         )
         return self.tum_haberleri_getir(filtre, limit=limit, skip=skip)
 
@@ -390,7 +392,9 @@ class MongoDB:
                 filtre["haber_turu"] = {"$in": turler}
 
         if ilce:
-            filtre["ilce"] = {"$regex": ilce, "$options": "i"}
+            # Tam eşleşme, büyük/küçük harf duyarsız. Kullanıcı girdisi regex'e
+            # kaçışlanarak konur ("(" gibi karakterler sorgu hatası vermesin).
+            filtre["ilce"] = {"$regex": f"^{re.escape(ilce.strip())}$", "$options": "i"}
 
         if baslangic_tarihi or bitis_tarihi:
             tarih_filtre = {}
@@ -422,7 +426,9 @@ class MongoDB:
             filtre["haber_turu"] = {"$in": gecerli_turler}
 
         if sadece_konumlu:
-            filtre["konum_geojson"] = {"$exists": True}
+            # Konumsuz haberler konum_geojson=None ile kaydedilir; $exists bunları
+            # da eşleştirdiği için $ne: None kullanılır.
+            filtre["konum_geojson"] = {"$ne": None}
 
         return filtre
 

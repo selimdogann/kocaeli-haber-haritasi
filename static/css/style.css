@@ -1,23 +1,29 @@
 /* =============================================
    KOCAELI HABER HARİTASI — ARAYÜZ
-   Palet: blue-black-cornflower (gece haritası + körfez mavisi)
+   Tema: açık "kâğıt harita" — soğuk gri zemin, beyaz yüzeyler, körfez mavisi
    Font: Host Grotesk (tek aile, sayılar tabular-nums)
+   Tüm metin renkleri beyaz üstünde en az 4.5:1 kontrast (WCAG AA)
    ============================================= */
 
 /* ---------- 1. Tokenlar ---------- */
 :root {
-    --bg: #0a0d14;
-    --surface: #131824;
-    --surface-2: #1a2131;
-    --line: #232b3d;
-    --line-strong: #323c52;
-    --ink: #e9edf3;
-    --muted: #9aa4b5;
-    --faint: #6f7a8d;
-    --accent: #5ab9fc;
-    --accent-hover: #7cc8fd;
-    --on-accent: #06121f;
-    --danger: #f2555a;
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #eef1f5;
+    --line: #e2e6ec;
+    --line-strong: #cdd3dc;
+    --ink: #14181f;
+    --muted: #5b6472;
+    --faint: #8a93a1;          /* sadece dekoratif ikon ve devre dışı durum */
+    --accent: #1c64d8;
+    --accent-hover: #1857bd;
+    --on-accent: #ffffff;
+    --danger: #d42a3a;
+    --success: #15803d;
+    --warning: #a15c07;
+    --shadow-sm: 0 1px 2px rgba(20, 24, 31, .06);
+    --shadow-md: 0 6px 20px -8px rgba(20, 24, 31, .22);
+    --shadow-lg: 0 24px 60px -20px rgba(20, 24, 31, .35);
 
     --r-sm: 6px;
     --r-md: 10px;
@@ -42,7 +48,7 @@
     --t-med: 220ms;
 
     --font: "Host Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    color-scheme: dark;
+    color-scheme: light;
 }
 
 /* ---------- 2. Temel ---------- */
@@ -102,8 +108,9 @@ a { color: var(--accent); }
 .panel {
     display: flex; flex-direction: column;
     min-height: 0;
-    background: var(--bg);
+    background: var(--surface);
     border-right: 1px solid var(--line);
+    box-shadow: 4px 0 24px -16px rgba(20, 24, 31, .25);
     position: relative; z-index: 5;
 }
 
@@ -159,11 +166,12 @@ a { color: var(--accent); }
     border: 1px solid var(--line);
     border-radius: var(--r-md);
     background: var(--surface);
+    box-shadow: var(--shadow-sm);
     cursor: pointer;
     user-select: none;
     transition: border-color var(--t-fast), background-color var(--t-fast), opacity var(--t-fast), transform var(--t-fast);
 }
-.chip:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.chip:hover { border-color: var(--line-strong); background: var(--bg); }
 .chip:active { transform: scale(.98); }
 .chip input { position: absolute; opacity: 0; pointer-events: none; }
 .chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -171,7 +179,7 @@ a { color: var(--accent); }
 .chip-icon {
     width: 28px; height: 28px; border-radius: var(--r-sm);
     display: grid; place-items: center;
-    background: var(--c); color: var(--bg);
+    background: var(--c); color: #fff;
     transition: background-color var(--t-fast), color var(--t-fast);
 }
 .chip-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -190,7 +198,7 @@ a { color: var(--accent); }
 }
 
 /* Kapalı kategori: ikon griye döner, sayı soluklaşır */
-.chip:not(:has(input:checked)) { background: transparent; }
+.chip:not(:has(input:checked)) { background: var(--bg); box-shadow: none; }
 .chip:not(:has(input:checked)) .chip-icon { background: var(--surface-2); color: var(--faint); }
 .chip:not(:has(input:checked)) .chip-label,
 .chip:not(:has(input:checked)) .chip-count { color: var(--faint); }
@@ -216,7 +224,7 @@ a { color: var(--accent); }
 select, input[type="date"], input[type="search"] {
     width: 100%; min-height: 44px;
     padding: 0 var(--s-3);
-    background: var(--surface);
+    background: var(--bg);
     border: 1px solid var(--line);
     border-radius: var(--r-sm);
     font-size: var(--fs-md);
@@ -224,13 +232,13 @@ select, input[type="date"], input[type="search"] {
 }
 select { appearance: none; padding-right: 36px; cursor: pointer; }
 select:hover, input[type="date"]:hover, input[type="search"]:hover { border-color: var(--line-strong); }
-select:focus-visible, input:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(90, 185, 252, .22); }
-input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cursor: pointer; }
+select:focus-visible, input:focus-visible { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(28, 100, 216, .18); }
+input[type="date"]::-webkit-calendar-picker-indicator { opacity: .6; cursor: pointer; }
 
 .segmented {
     display: grid; grid-template-columns: repeat(4, 1fr);
     padding: 3px; gap: 2px;
-    background: var(--surface);
+    background: var(--bg);
     border: 1px solid var(--line);
     border-radius: var(--r-sm);
 }
@@ -241,7 +249,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
 }
 .segmented button:hover { color: var(--ink); background: var(--surface-2); }
 .segmented button:active { transform: scale(.97); }
-.segmented button[aria-pressed="true"] { background: var(--line-strong); color: var(--ink); }
+.segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm), 0 0 0 1px var(--line); }
 
 .date-row {
     display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--s-2);
@@ -263,8 +271,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
 .search { position: relative; margin-bottom: var(--s-3); }
 .search .i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--faint); width: 16px; height: 16px; }
 .search input { padding-left: 36px; }
-.search input::placeholder { color: var(--faint); }
-.search input::-webkit-search-cancel-button { filter: invert(.7); cursor: pointer; }
+.search input::placeholder { color: var(--muted); }
+.search input::-webkit-search-cancel-button { cursor: pointer; }
 
 .list-scroll {
     flex: 1; min-height: 0;
@@ -291,9 +299,9 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
     content: ""; grid-row: 1 / span 2;
     width: 3px; border-radius: 3px; background: var(--c);
 }
-.haber-card:hover { background: var(--surface); }
+.haber-card:hover { background: var(--bg); }
 .haber-card:active { background: var(--surface-2); }
-.haber-card[aria-current="true"] { background: var(--surface-2); }
+.haber-card[aria-current="true"] { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
 .haber-card[data-konumsuz] .haber-card-title { color: var(--muted); }
 
 .haber-card-title {
@@ -325,7 +333,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
 }
 
 /* ---------- 8. Harita alanı ---------- */
-.map-shell { position: relative; min-width: 0; background: #0c1220; }
+.map-shell { position: relative; min-width: 0; background: #e8ecf1; }
 .map { position: absolute; inset: 0; }
 
 .map-empty {
@@ -338,7 +346,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
 .map-empty .i { width: 40px; height: 40px; color: var(--faint); stroke-width: 1.4; margin-bottom: var(--s-2); }
 .map-empty h2 { font-size: var(--fs-lg); font-weight: 600; color: var(--ink); }
 .map-empty p { max-width: 42ch; }
-.map-empty code { font-size: .92em; padding: 1px 5px; border-radius: 4px; background: var(--surface-2); color: var(--ink); }
+.map-empty code { font-size: .92em; padding: 1px 5px; border-radius: 4px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); }
 
 .toolbar {
     position: absolute; top: var(--s-4); right: var(--s-4);
@@ -358,17 +366,18 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
 .btn:active { transform: translateY(0) scale(.98); }
 .btn:disabled { cursor: progress; transform: none; }
 
-.btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 6px 20px -8px rgba(90, 185, 252, .6); }
+.btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 6px 18px -8px rgba(28, 100, 216, .55); }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-primary:disabled { background: var(--surface-2); color: var(--muted); box-shadow: none; }
 .btn-primary:disabled .i { animation: spin 1s linear infinite; }
 
 .btn-ghost {
-    background: rgba(10, 13, 20, .86); color: var(--ink);
+    background: rgba(255, 255, 255, .94); color: var(--ink);
     border: 1px solid var(--line-strong);
+    box-shadow: var(--shadow-md);
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.btn-ghost:hover { background: var(--surface-2); }
+.btn-ghost:hover { background: var(--surface); border-color: var(--muted); }
 
 .icon-btn {
     width: 44px; height: 44px; border-radius: var(--r-sm);
@@ -383,8 +392,9 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
     margin-left: auto;
     padding: var(--s-3);
     border-radius: var(--r-md);
-    background: rgba(10, 13, 20, .92);
-    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-md);
 }
 .progress[hidden] { display: none; }
 .progress-top { display: flex; justify-content: space-between; gap: var(--s-3); font-size: var(--fs-sm); margin-bottom: var(--s-2); }
@@ -396,10 +406,10 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
 /* ---------- 9. Google Maps InfoWindow ---------- */
 .gm-style .gm-style-iw-c {
     background: var(--surface) !important;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--line);
     border-radius: var(--r-md) !important;
     padding: 0 !important;
-    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .7) !important;
+    box-shadow: var(--shadow-lg) !important;
     max-width: 340px !important;
 }
 .gm-style .gm-style-iw-d { overflow: auto !important; padding: 0 !important; }
@@ -431,7 +441,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
     font-size: var(--fs-sm); font-weight: 500; text-decoration: none;
     transition: background-color var(--t-fast);
 }
-.iw-link:hover { background: var(--line-strong); }
+.iw-link:hover { background: var(--line); }
 .iw-link svg { width: 14px; height: 14px; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .iw-link:first-of-type { background: var(--accent); color: var(--on-accent); }
 .iw-link:first-of-type svg { stroke: var(--on-accent); }
@@ -448,16 +458,16 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
     max-width: 440px;
     padding: var(--s-3) var(--s-4);
     border-radius: var(--r-md);
-    background: var(--surface-2);
-    border: 1px solid var(--line-strong);
-    box-shadow: 0 16px 32px -12px rgba(0, 0, 0, .7);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-lg);
     font-size: var(--fs-md);
     pointer-events: auto;
     animation: toast-in var(--t-med) var(--ease);
 }
 .toast::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--accent); }
-.toast.basarili::before { background: #7bd88f; }
-.toast.uyari::before { background: #f2c94c; }
+.toast.basarili::before { background: var(--success); }
+.toast.uyari::before { background: var(--warning); }
 .toast.hata::before { background: var(--danger); }
 .toast.cikis { animation: toast-out 160ms ease-in forwards; }
 
@@ -468,11 +478,11 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
     max-height: calc(100dvh - 48px);
     border: 1px solid var(--line-strong);
     border-radius: var(--r-lg);
-    background: var(--bg); color: var(--ink);
-    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .8);
+    background: var(--surface); color: var(--ink);
+    box-shadow: var(--shadow-lg);
 }
 .sheet[open] { animation: sheet-in var(--t-med) var(--ease); }
-.sheet::backdrop { background: rgba(4, 6, 10, .72); backdrop-filter: blur(3px); }
+.sheet::backdrop { background: rgba(20, 24, 31, .38); backdrop-filter: blur(2px); }
 .sheet-inner { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); }
 .sheet-head {
     display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
@@ -487,7 +497,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
 .haber-tablo { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 .haber-tablo th {
     position: sticky; top: 0; z-index: 1;
-    background: var(--bg);
+    background: var(--surface);
     text-align: left; font-size: var(--fs-sm); font-weight: 500; color: var(--muted);
     padding: var(--s-3) var(--s-4);
     border-bottom: 1px solid var(--line);
@@ -495,7 +505,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
 .haber-tablo th:first-child, .haber-tablo td:first-child { padding-left: var(--s-6); }
 .haber-tablo td { padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--line); vertical-align: top; }
 .haber-tablo tbody tr { transition: background-color var(--t-fast); }
-.haber-tablo tbody tr:hover { background: var(--surface); }
+.haber-tablo tbody tr:hover { background: var(--bg); }
 .tablo-tur { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: var(--fs-sm); font-weight: 500; color: var(--c); }
 .tablo-tur i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
 .tablo-baslik { font-weight: 500; line-height: 1.4; min-width: 280px; max-width: 520px; }
@@ -508,7 +518,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
     font-size: var(--fs-sm); font-weight: 500; text-decoration: none;
     transition: background-color var(--t-fast), border-color var(--t-fast);
 }
-.tablo-link:hover { background: var(--surface-2); border-color: var(--accent); }
+.tablo-link:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
 .tablo-link svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tablo-durum { padding: var(--s-6) !important; color: var(--muted); }
 
@@ -542,7 +552,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.75); cur
         border-right: 0;
         border-top: 1px solid var(--line-strong);
         border-radius: var(--r-lg) var(--r-lg) 0 0;
-        box-shadow: 0 -20px 40px -20px rgba(0, 0, 0, .8);
+        box-shadow: 0 -16px 40px -16px rgba(20, 24, 31, .35);
         transform: translateY(calc(100% - 132px));
         transition: transform 300ms var(--ease);
     }

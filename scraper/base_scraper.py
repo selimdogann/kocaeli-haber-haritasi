@@ -6,6 +6,7 @@ Her haber sitesi için ortak işlevsellik sağlar.
 Cloudflare korumalı siteler için Playwright (headless) desteği içerir.
 """
 
+import re
 import requests
 from bs4 import BeautifulSoup
 from abc import ABC, abstractmethod
@@ -79,8 +80,25 @@ def selenium_driver_kapat():
 class BaseScraper(ABC):
     """Tüm scraper'ların temel sınıfı."""
 
-    # Alt sınıflar True yaparak Selenium kullanımını etkinleştirir
+    # Alt sınıflar True yaparak Playwright kullanımını etkinleştirir
     CLOUDFLARE_KORUMALI = False
+
+    # Haber gövdesinden atılacak arayüz/yorum kırıntıları
+    IGNORE_PHRASES = [
+        "Yorumunuz",
+        "Topluluk Kuralları",
+        "Oturum aç",
+        "Okunma",
+        "Yazdır",
+    ]
+
+    # Haber gövdesi içinde olup haberin parçası olmayan bölümler
+    GURULTU_SECICILERI = [
+        "script", "style", "iframe", "aside", "footer", "form", "button",
+        ".comments", ".comment", ".yorum", ".yorumlar", ".social", ".share",
+        ".paylas", ".related", ".ilgili-haberler", ".post-tags", ".news-tags",
+        ".tags", ".etiketler", ".advertisement", ".reklam", ".ads",
+    ]
 
     def __init__(self, kaynak_adi: str, base_url: str):
         """
@@ -106,6 +124,9 @@ class BaseScraper(ABC):
         })
         self.timeout = Config.REQUEST_TIMEOUT
         self.gecikme = Config.REQUEST_DELAY
+        # Site bot korumasıyla (Cloudflare challenge) erişimi reddederse True olur;
+        # o kaynağa bu çalıştırmada başka istek atılmaz.
+        self.engellendi = False
 
     def sayfa_getir(self, url: str) -> BeautifulSoup:
         """
@@ -124,6 +145,8 @@ class BaseScraper(ABC):
 
     def _sayfa_getir_requests(self, url: str) -> BeautifulSoup:
         """Standart requests kütüphanesi ile sayfa çeker."""
+        if self.engellendi:
+            return None
         try:
             if self.gecikme > 0:
                 time.sleep(self.gecikme)
@@ -143,13 +166,27 @@ class BaseScraper(ABC):
         except requests.exceptions.Timeout:
             logger.error(f"Zaman aşımı: {url}")
         except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP hatası ({e.response.status_code}): {url}")
+            if self._bot_korumasi_mi(e.response):
+                self.engellendi = True
+                logger.warning(
+                    f"{self.kaynak_adi}: site bot korumasıyla erişimi reddetti "
+                    f"(Cloudflare challenge). Bu çalıştırmada kaynak atlanıyor."
+                )
+            else:
+                logger.error(f"HTTP hatası ({e.response.status_code}): {url}")
         except requests.exceptions.ConnectionError:
             logger.error(f"Bağlantı hatası: {url}")
         except Exception as e:
             logger.error(f"Sayfa çekme hatası: {url} - {e}")
 
         return None
+
+    @staticmethod
+    def _bot_korumasi_mi(response) -> bool:
+        """Yanıt bir bot doğrulama (challenge) sayfası mı?"""
+        if response is None or response.status_code not in (403, 429, 503):
+            return False
+        return "cf-mitigated" in response.headers or "Just a moment" in (response.text or "")[:2000]
 
     def _sayfa_getir_playwright(self, url: str) -> BeautifulSoup:
         """Playwright ile sayfa çeker (headless Cloudflare bypass)."""
@@ -183,6 +220,46 @@ class BaseScraper(ABC):
             logger.error(f"Playwright sayfa çekme hatası: {url} - {e}")
 
         return None
+
+    def _icerigi_temizle(self, metin: str) -> str:
+        """UI ve yorum kırıntılarını metinden temizler, boşlukları sadeleştirir."""
+        temiz_metin = metin or ""
+        for ifade in self.IGNORE_PHRASES:
+            temiz_metin = temiz_metin.replace(ifade, " ")
+        return re.sub(r"\s+", " ", temiz_metin).strip()
+
+    def _paragraf_metinlerini_topla(self, kapsayici) -> str:
+        """
+        Haber gövdesindeki <p> metinlerini birleştirir.
+        Önce yorum, paylaş, reklam gibi bölümler gövdeden silinir.
+        """
+        if not kapsayici:
+            return ""
+
+        for secici in self.GURULTU_SECICILERI:
+            for tag in kapsayici.select(secici):
+                tag.decompose()
+
+        paragraflar = []
+        for p in kapsayici.find_all("p"):
+            metin = self._icerigi_temizle(p.get_text(" ", strip=True))
+            if len(metin) < 30:
+                continue
+            if any(ifade.lower() in metin.lower() for ifade in self.IGNORE_PHRASES):
+                continue
+            paragraflar.append(metin)
+
+        return " ".join(paragraflar)
+
+    def govde_metni(self, kapsayici) -> str:
+        """
+        Haber gövdesinin temiz metnini döndürür.
+        Paragraf (<p>) kullanmayan sayfalar için gürültüsü silinmiş düz metne düşer.
+        """
+        metin = self._paragraf_metinlerini_topla(kapsayici)
+        if len(metin) > 50 or not kapsayici:
+            return metin
+        return self._icerigi_temizle(kapsayici.get_text(" ", strip=True))
 
     def son_n_gun_icinde_mi(self, tarih: datetime, gun: int = None) -> bool:
         """

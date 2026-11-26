@@ -17,13 +17,6 @@ class OzgurKocaeliScraper(BaseScraper):
 
     CLOUDFLARE_KORUMALI = True
 
-    IGNORE_PHRASES = [
-        "Yorumunuz",
-        "Topluluk Kuralları",
-        "Oturum aç",
-        "Okunma",
-        "Yazdır",
-    ]
 
     def __init__(self):
         super().__init__(
@@ -44,51 +37,6 @@ class OzgurKocaeliScraper(BaseScraper):
             return False
         # Daktilo CMS haber URL formatı: /haber/{id}/{slug}
         return bool(re.search(r'/haber/\d+/', href))
-
-    def _icerigi_temizle(self, metin: str) -> str:
-        """UI ve yorum kırıntılarını içerikten temizler."""
-        temiz_metin = metin or ""
-        for ifade in self.IGNORE_PHRASES:
-            temiz_metin = temiz_metin.replace(ifade, " ")
-
-        temiz_metin = re.sub(r"\s+", " ", temiz_metin).strip()
-        return temiz_metin
-
-    def _paragraf_metinlerini_topla(self, kapsayici) -> str:
-        """Haber gövdesindeki paragraf metinlerini birleştirir."""
-        if not kapsayici:
-            return ""
-
-        for secici in [
-            "script",
-            "style",
-            "iframe",
-            "aside",
-            "footer",
-            "form",
-            "button",
-            ".comments",
-            ".comment",
-            ".yorum",
-            ".social",
-            ".share",
-            ".related",
-            ".post-tags",
-            ".news-tags",
-        ]:
-            for tag in kapsayici.select(secici):
-                tag.decompose()
-
-        paragraflar = []
-        for p in kapsayici.find_all("p"):
-            metin = self._icerigi_temizle(p.get_text(" ", strip=True))
-            if len(metin) < 30:
-                continue
-            if any(ifade.lower() in metin.lower() for ifade in self.IGNORE_PHRASES):
-                continue
-            paragraflar.append(metin)
-
-        return " ".join(paragraflar)
 
     def haber_listesi_getir(self) -> list:
         """Özgür Kocaeli'den haber linklerini çeker."""

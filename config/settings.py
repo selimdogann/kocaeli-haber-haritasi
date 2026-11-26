@@ -30,8 +30,10 @@ class Config:
     # Scraping Ayarları
     SCRAPING_DAYS = int(os.getenv("SCRAPING_DAYS", 3))
     REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", 20))
-    REQUEST_DELAY = float(os.getenv("REQUEST_DELAY", 0.1))
-    SCRAPER_MAX_WORKERS = int(os.getenv("SCRAPER_MAX_WORKERS", 12))
+    # Kibar scraping: kaynak başına az paralel istek ve istekler arası bekleme.
+    # Yüksek değerler sitelerin bot korumasını tetikleyip IP'yi engelletebilir.
+    REQUEST_DELAY = float(os.getenv("REQUEST_DELAY", 1.0))
+    SCRAPER_MAX_WORKERS = int(os.getenv("SCRAPER_MAX_WORKERS", 2))
     SCRAPER_MAX_LINKS_PER_SOURCE = int(os.getenv("SCRAPER_MAX_LINKS_PER_SOURCE", 50))
     PROCESSING_MAX_WORKERS = int(os.getenv("PROCESSING_MAX_WORKERS", 5))
 
@@ -74,37 +76,37 @@ class Config:
     NEWS_TYPES = {
         "trafik_kazasi": {
             "label": "Trafik Kazası",
-            "color": "#F2555A",
+            "color": "#D42A3A",
             "icon": "🚗",
             "marker_color": "red",
         },
         "yangin": {
             "label": "Yangın",
-            "color": "#F7934C",
+            "color": "#C2410C",
             "icon": "🔥",
             "marker_color": "orange",
         },
         "elektrik_kesintisi": {
             "label": "Elektrik Kesintisi",
-            "color": "#F2C94C",
+            "color": "#A15C07",
             "icon": "⚡",
             "marker_color": "yellow",
         },
         "asayis": {
             "label": "Asayiş",
-            "color": "#EC6FB0",
+            "color": "#BE185D",
             "icon": "🚨",
             "marker_color": "darkred",
         },
         "hirsizlik": {
             "label": "Hırsızlık",
-            "color": "#4FD1C5",
+            "color": "#0F766E",
             "icon": "🔒",
             "marker_color": "purple",
         },
         "kulturel_etkinlik": {
             "label": "Kültürel Etkinlikler",
-            "color": "#7BD88F",
+            "color": "#15803D",
             "icon": "🎭",
             "marker_color": "blue",
         },
