@@ -1,149 +1,143 @@
 /* =============================================
-   KOCAELI HABER HARİTASI - ANA JAVASCRIPT DOSYASI
-   Google Maps Entegrasyonu & API İletişimi
+   KOCAELI HABER HARİTASI — ANA JAVASCRIPT
+   Google Maps entegrasyonu, filtreler, sanal liste, API iletişimi
    ============================================= */
 
-// ==================== GLOBAL DEĞİŞKENLER ====================
-let map;
+// ==================== GLOBAL DURUM ====================
+let map = null;
+let infoWindow = null;
 let markers = [];
-let infoWindow;
-let haberler = [];
+let haberler = [];          // API'den gelen (filtrelenmiş) haberler
+let gorunenHaberler = [];   // + başlık araması uygulanmış hali
+let aktifHaberAnahtari = null;
 const CAKISAN_MARKER_OFFSET = 0.00018;
 
-// ==================== HARİTA BAŞLATMA ====================
+// ==================== İKONLAR (Lucide, MIT) ====================
+// Emoji yerine SVG: her platformda aynı görünür, renk/kalınlık kontrol edilebilir.
+const TUR_IKONLARI = {
+    trafik_kazasi: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+    yangin: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+    elektrik_kesintisi: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    asayis: '<path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1M18.5 4.5 18 5M2 12h1M12 2v1M4.93 4.93l.7.7M12 12v6"/>',
+    hirsizlik: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+    kulturel_etkinlik: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+};
+const VARSAYILAN_IKON = '<circle cx="12" cy="12" r="4"/>';
+
+const UI_IKON = {
+    takvim: '<path d="M8 2v4M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+    konum: '<path d="M20 10c0 5-5.5 10.2-7.4 11.8a1 1 0 0 1-1.2 0C9.5 20.2 4 15 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+    gazete: '<path d="M15 18h-5M18 14h-8"/><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"/><rect width="8" height="4" x="10" y="6" rx="1"/>',
+    dis: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+    yayin: '<path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5M19.1 4.9C23 8.8 23 15.1 19.1 19"/>',
+};
+
+function svg(icerik, ekSinif = '') {
+    return `<svg class="${ekSinif}" viewBox="0 0 24 24" aria-hidden="true">${icerik}</svg>`;
+}
+
+function turBilgisi(turId) {
+    return CONFIG.newsTypes[turId] || { color: '#9aa4b5', label: 'Diğer' };
+}
+
+// Chip ikonlarını doldur (Jinja sadece yer tutucu basar)
+document.querySelectorAll('[data-tur-ikon]').forEach(el => {
+    el.innerHTML = svg(TUR_IKONLARI[el.dataset.turIkon] || VARSAYILAN_IKON);
+});
+
+// ==================== BAŞLANGIÇ ====================
+// Veri, haritadan bağımsız yüklenir: Maps anahtarı yoksa bile liste ve sayılar çalışır.
+document.addEventListener('DOMContentLoaded', () => {
+    haberleriGetir();
+    istatistikleriGetir();
+    if (!CONFIG.mapsKeyVar) haritaHatasiGoster();
+});
+
+// Google Maps anahtar hatası (geçersiz key, faturalandırma kapalı vb.)
+window.gm_authFailure = function () {
+    haritaHatasiGoster('Google Maps anahtarı reddedildi. Anahtarın geçerli olduğunu ve Maps JavaScript API\'nin açık olduğunu kontrol et.');
+};
+
+function haritaHatasiGoster(metin) {
+    const kutu = document.getElementById('map-empty');
+    if (metin) document.getElementById('map-empty-metin').textContent = metin;
+    kutu.hidden = false;
+    document.getElementById('map').style.visibility = 'hidden';
+}
+
+// ==================== HARİTA ====================
 // Google Maps API yüklendiğinde callback olarak çağrılır.
 // Harita Kocaeli merkez koordinatlarında (40.7654, 29.9408) başlatılır.
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
         center: { lat: CONFIG.centerLat, lng: CONFIG.centerLng },
-        zoom: 11, // Kocaeli ili genelini gösterecek yakınlaştırma seviyesi
-        mapTypeControl: true,
-        mapTypeControlOptions: {
-            style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-            position: google.maps.ControlPosition.TOP_RIGHT
-        },
-        streetViewControl: false,
-        fullscreenControl: true,
+        zoom: 11,
+        backgroundColor: '#0c1220',
+        disableDefaultUI: true,
         zoomControl: true,
-        zoomControlOptions: {
-            position: google.maps.ControlPosition.RIGHT_CENTER
-        },
-        styles: [
-            { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
-            { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
-            { elementType: 'labels.text.fill', stylers: [{ color: '#8899aa' }] },
-            { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#2a3a50' }] },
-            { featureType: 'administrative.land_parcel', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
-            { featureType: 'landscape', elementType: 'geometry.fill', stylers: [{ color: '#162033' }] },
-            { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#1e2d42' }] },
-            { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-            { featureType: 'poi.park', elementType: 'geometry.fill', stylers: [{ color: '#1a3328' }] },
-            { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#253347' }] },
-            { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1a2332' }] },
-            { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2d4a6f' }] },
-            { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1a2332' }] },
-            { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e2d42' }] },
-            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1a2b' }] },
-            { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3d5a80' }] },
-        ]
+        zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM },
+        fullscreenControl: false,
+        clickableIcons: false,
+        styles: HARITA_STILI,
     });
 
-    infoWindow = new google.maps.InfoWindow();
+    infoWindow = new google.maps.InfoWindow({ maxWidth: 340 });
+    infoWindow.addListener('closeclick', () => aktifKartiIsaretle(null));
 
-    haberleriGetir();
-    istatistikleriGetir();
+    // Veri haritadan önce geldiyse marker'ları şimdi çiz
+    if (haberler.length) haritayiGuncelle();
 }
 
-// ==================== SVG PIN İKON OLUŞTURUCU ====================
-// Beyaz pin + renkli yuvarlak kare badge stili (referans görsele uygun)
+// Sakin, düşük kontrastlı gece haritası: pinler tek doygun renk olsun diye.
+const HARITA_STILI = [
+    { elementType: 'geometry', stylers: [{ color: '#10151f' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#7d889b' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#0a0d14' }] },
+    { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+    { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#2a3346' }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#b4bdcc' }] },
+    { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
+    { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
+    { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ visibility: 'on' }, { color: '#121c1c' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1a2131' }] },
+    { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'simplified' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#25304a' }] },
+    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#8592a8' }] },
+    { featureType: 'road.local', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+    { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0b1a2c' }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3b5a7d' }] },
+];
 
-function pinSvgOlustur(renk, ikonSvg) {
-    // id collision'u önlemek için renk hash'i
-    const hid = renk.replace('#','');
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
-        <defs>
-            <filter id="ds${hid}" x="-30%" y="-10%" width="160%" height="140%">
-                <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-color="#000" flood-opacity="0.25"/>
-            </filter>
-        </defs>
-        <!-- Beyaz pin gövdesi -->
-        <path d="M20 50C20 50 37 30 37 17.5C37 8.4 29.4 1 20 1C10.6 1 3 8.4 3 17.5C3 30 20 50 20 50Z"
-              fill="#fff" stroke="#d1d5db" stroke-width="1" filter="url(#ds${hid})"/>
-        <!-- Renkli yuvarlak kare badge -->
-        <rect x="8" y="6" width="24" height="24" rx="7" fill="${renk}"/>
-        <!-- İkon -->
-        ${ikonSvg}
+// ==================== MARKER İKONLARI ====================
+// Kategori renginde damla pin + koyu ikon. Renk tek başına anlam taşımasın diye
+// her türün kendi ikonu var (erişilebilirlik: "color only" kuralı).
+const MARKER_CACHE = {};
+
+function markerIkonu(turId, aktif = false) {
+    const anahtar = `${turId}|${aktif}`;
+    if (MARKER_CACHE[anahtar]) return MARKER_CACHE[anahtar];
+
+    const renk = turBilgisi(turId).color;
+    const ikon = TUR_IKONLARI[turId] || VARSAYILAN_IKON;
+    const olcek = aktif ? 1.25 : 1;
+    const w = Math.round(34 * olcek), h = Math.round(44 * olcek);
+
+    const kod = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 34 44">
+        <path d="M17 42.5S31.5 27.6 31.5 16.6A14.5 14.5 0 0 0 2.5 16.6C2.5 27.6 17 42.5 17 42.5Z"
+              fill="${renk}" stroke="#0a0d14" stroke-width="2"/>
+        ${aktif ? `<path d="M17 42.5S31.5 27.6 31.5 16.6A14.5 14.5 0 0 0 2.5 16.6C2.5 27.6 17 42.5 17 42.5Z" fill="none" stroke="#e9edf3" stroke-width="1.2" transform="translate(17 22) scale(1.06) translate(-17 -22)"/>` : ''}
+        <g transform="translate(8 7.6) scale(.75)" fill="none" stroke="#0a0d14" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round">${ikon}</g>
     </svg>`;
-}
 
-let MARKER_ICONS = null;
-
-function markerIkonlariniHazirla() {
-    if (MARKER_ICONS) return;
-
-    const ikonlar = {
-        // Trafik Kazası — kırmızı badge, beyaz araba
-        trafik_kazasi: pinSvgOlustur('#DC2626',
-            `<g fill="#fff" transform="translate(20,18)">
-                <path d="M-7,0 L-5.5,-4 L5.5,-4 L7,0 Z" stroke="#fff" stroke-width="0.5"/>
-                <rect x="-7" y="0" width="14" height="3.5" rx="1"/>
-                <circle cx="-4.5" cy="5" r="2" fill="#fff"/>
-                <circle cx="4.5" cy="5" r="2" fill="#fff"/>
-                <circle cx="-4.5" cy="5" r="1" fill="#DC2626"/>
-                <circle cx="4.5" cy="5" r="1" fill="#DC2626"/>
-                <rect x="-4" y="-3.5" width="3.2" height="2.5" rx="0.8" fill="#DC2626" opacity="0.4"/>
-                <rect x="0.8" y="-3.5" width="3.2" height="2.5" rx="0.8" fill="#DC2626" opacity="0.4"/>
-            </g>`),
-
-        // Yangın — turuncu badge, beyaz alev
-        yangin: pinSvgOlustur('#EA580C',
-            `<g fill="#fff" transform="translate(20,18)">
-                <path d="M0,-8 C0,-8 -6,-2 -6,2.5 C-6,5.8 -3.3,8.5 0,8.5 C3.3,8.5 6,5.8 6,2.5 C6,-2 0,-8 0,-8Z"/>
-                <path d="M0,-3 C0,-3 -2.8,0 -2.8,2 C-2.8,3.5 -1.5,4.8 0,4.8 C1.5,4.8 2.8,3.5 2.8,2 C2.8,0 0,-3 0,-3Z" fill="#EA580C" opacity="0.5"/>
-            </g>`),
-
-        // Elektrik Kesintisi — koyu badge, sarı şimşek
-        elektrik_kesintisi: pinSvgOlustur('#1e293b',
-            `<polygon points="22,8 16,17.5 19,17.5 16,26 24,15.5 20.5,15.5 22.5,8" fill="#FACC15"/>`),
-
-        // Asayiş — koyu kırmızı badge, beyaz ünlem/siren ikonu
-        asayis: pinSvgOlustur('#B91C1C',
-            `<g fill="#fff" transform="translate(20,18)">
-                <path d="M0,-8 L-6,4 L6,4 Z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
-                <line x1="0" y1="-4" x2="0" y2="1" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-                <circle cx="0" cy="3.5" r="1.2" fill="#fff"/>
-            </g>`),
-
-        // Hırsızlık — mor badge, beyaz gözlük/maske ikonu
-        hirsizlik: pinSvgOlustur('#7C3AED',
-            `<g fill="#fff" transform="translate(20,18)">
-                <ellipse cx="-3.8" cy="-1" rx="3.2" ry="2.5" fill="none" stroke="#fff" stroke-width="2"/>
-                <ellipse cx="3.8" cy="-1" rx="3.2" ry="2.5" fill="none" stroke="#fff" stroke-width="2"/>
-                <path d="M-0.6,-1 L0.6,-1" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-                <line x1="-7" y1="-1" x2="-7" y2="-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-                <line x1="7" y1="-1" x2="7" y2="-3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-                <path d="M-5,4 C-5,4 -2.5,7 0,7 C2.5,7 5,4 5,4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
-            </g>`),
-
-        // Kültürel Etkinlik — mavi badge, beyaz müzik notu
-        kulturel_etkinlik: pinSvgOlustur('#2563EB',
-            `<g fill="#fff" transform="translate(20,18)">
-                <circle cx="-3.5" cy="5" r="3"/>
-                <circle cx="4" cy="3.5" r="3"/>
-                <rect x="-0.8" y="-7" width="2.2" height="12.5"/>
-                <rect x="3.7" y="-7" width="2.2" height="10.5"/>
-                <path d="M1.4,-7 L5.9,-7 L5.9,-4 L1.4,-4Z" rx="1"/>
-            </g>`),
+    MARKER_CACHE[anahtar] = {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(kod),
+        scaledSize: new google.maps.Size(w, h),
+        anchor: new google.maps.Point(w / 2, h - 1),
     };
-
-    MARKER_ICONS = {};
-    for (const [tur, svg] of Object.entries(ikonlar)) {
-        MARKER_ICONS[tur] = {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-            scaledSize: new google.maps.Size(40, 52),
-            anchor: new google.maps.Point(20, 52),
-        };
-    }
+    return MARKER_CACHE[anahtar];
 }
 
 // ==================== API İSTEKLERİ ====================
@@ -152,40 +146,28 @@ async function haberleriGetir() {
     try {
         const params = filtreParametreleriOlustur();
         params._ts = Date.now();
-        const queryString = new URLSearchParams(params).toString();
-        const response = await fetch(`/api/haberler?${queryString}`, {
-            cache: 'no-store',
-        });
+        const response = await fetch(`/api/haberler?${new URLSearchParams(params)}`, { cache: 'no-store' });
         const data = await response.json();
 
-        if (data.basarili) {
-            haberler = data.haberler;
-            markerlariTemizle();
-            haberleriHaritayaEkle(haberler);
-            haberListesiniGuncelle(haberler);
-            document.getElementById('toplam-haber-sayisi').textContent = data.toplam;
-        }
+        if (!data.basarili) throw new Error(data.hata || 'Bilinmeyen hata');
+        haberler = data.haberler;
+        aramaYap();
     } catch (error) {
         console.error('Haberler yüklenirken hata:', error);
-        bildirimGoster('Haberler yüklenirken hata oluştu', 'hata');
+        listeDurumu('hata');
+        bildirimGoster('Haberler alınamadı. Sunucu ve MongoDB çalışıyor mu?', 'hata');
     }
 }
 
 async function istatistikleriGetir() {
     try {
         const params = filtreParametreleriOlustur();
+        // Chip sayıları tüm türleri göstermeli; tür filtresini istatistikten çıkar
+        delete params.haber_turu;
         params._ts = Date.now();
-        const queryString = new URLSearchParams(params).toString();
-        const response = await fetch(`/api/istatistikler?${queryString}`, {
-            cache: 'no-store',
-        });
+        const response = await fetch(`/api/istatistikler?${new URLSearchParams(params)}`, { cache: 'no-store' });
         const data = await response.json();
-        if (data.basarili) {
-            const stats = data.istatistikler;
-            document.getElementById('stat-toplam').textContent = stats.toplam_haber || 0;
-            document.getElementById('stat-konumlu').textContent = stats.konumlu_haber || 0;
-            turDagilimiOlustur(stats.tur_dagilimi || {});
-        }
+        if (data.basarili) turDagilimiOlustur(data.istatistikler.tur_dagilimi || {});
     } catch (error) {
         console.error('İstatistikler yüklenirken hata:', error);
     }
@@ -195,87 +177,84 @@ let progressInterval = null;
 
 async function scrapingBaslat() {
     const btn = document.getElementById('btn-scrape');
+    const btnText = btn.querySelector('.btn-text');
+    const progress = document.getElementById('progress');
     btn.disabled = true;
-    btn.innerHTML = '⏳ Başlatılıyor...';
-    loadingGoster(true);
-    bildirimGoster('Haber çekme işlemi başlatıldı, lütfen bekleyiniz...', 'uyari');
+    btnText.textContent = 'Güncelleniyor';
+    progress.hidden = false;
+    progressYaz('Başlatılıyor', 0);
 
     progressInterval = setInterval(async () => {
         try {
-            const res = await fetch('/api/scrape/progress');
-            const p = await res.json();
-            if (p.aktif) {
-                let text = `⏳ %${p.yuzde}`;
-                if (p.asama === 'Haberler çekiliyor') {
-                    text += ` · ${p.kaynak} (${p.kaynak_no}/${p.toplam_kaynak})`;
-                } else if (p.asama === 'Haberler işleniyor') {
-                    text += ` · İşleniyor ${p.islenen_haber}/${p.toplam_haber}`;
-                } else {
-                    text += ` · ${p.asama}`;
-                }
-                btn.innerHTML = text;
-            }
-        } catch (e) {}
+            const p = await (await fetch('/api/scrape/progress')).json();
+            if (!p.aktif) return;
+            let asama = p.asama;
+            if (p.asama === 'Haberler çekiliyor') asama = `${p.kaynak} taranıyor (${p.kaynak_no}/${p.toplam_kaynak})`;
+            else if (p.asama === 'Haberler işleniyor') asama = `İşleniyor: ${p.islenen_haber}/${p.toplam_haber}`;
+            progressYaz(asama, p.yuzde);
+        } catch (e) { /* ilerleme sorgusu kaçabilir, sorun değil */ }
     }, 800);
 
     try {
-        const response = await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-        const data = await response.json();
+        const data = await (await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' } })).json();
         if (data.basarili) {
-            const rapor = data.rapor;
-            bildirimGoster(`✅ Tamamlandı! ${rapor.toplam_kaydedilen} yeni haber eklendi (${rapor.toplam_cekilen} tarandı, ${rapor.sure_saniye.toFixed(0)}s)`, 'basarili');
-            await haberleriGetir();
-            await istatistikleriGetir();
+            const r = data.rapor;
+            bildirimGoster(`Güncellendi: ${r.toplam_kaydedilen} yeni haber eklendi, ${r.toplam_cekilen} haber tarandı (${r.sure_saniye.toFixed(0)} sn).`, 'basarili');
+            await Promise.all([haberleriGetir(), istatistikleriGetir()]);
         } else {
-            bildirimGoster('Haber çekme sırasında hata: ' + (data.mesaj || 'Bilinmeyen hata'), 'hata');
+            bildirimGoster('Güncelleme yarıda kaldı: ' + (data.hata || data.mesaj || 'bilinmeyen hata'), 'hata');
         }
     } catch (error) {
         console.error('Scraping hatası:', error);
-        bildirimGoster('Sunucuyla bağlantı kurulamadı', 'hata');
+        bildirimGoster('Sunucuya ulaşılamadı. Flask çalışıyor mu?', 'hata');
     } finally {
         clearInterval(progressInterval);
         progressInterval = null;
         btn.disabled = false;
-        btn.innerHTML = '🔄 Haberleri Güncelle';
-        loadingGoster(false);
+        btnText.textContent = 'Haberleri güncelle';
+        progress.hidden = true;
     }
+}
+
+function progressYaz(asama, yuzde) {
+    document.getElementById('progress-asama').textContent = asama;
+    document.getElementById('progress-yuzde').textContent = `%${Math.round(yuzde || 0)}`;
+    document.getElementById('progress-bar').style.width = `${yuzde || 0}%`;
 }
 
 // ==================== HARİTA İŞLEMLERİ ====================
 
-function haberleriHaritayaEkle(haberListesi) {
-    const gosterimKonumlari = cakisanMarkerKonumlariniHesapla(haberListesi);
+function haritayiGuncelle() {
+    if (!map) return;
+    markerlariTemizle();
+    const konumlar = cakisanMarkerKonumlariniHesapla(gorunenHaberler);
 
-    haberListesi.forEach((haber, index) => {
-        if (haber.koordinatlar && haber.koordinatlar.lat && haber.koordinatlar.lng) {
-            const anahtar = haberKonumAnahtari(haber, index);
-            markerOlustur(haber, gosterimKonumlari.get(anahtar), anahtar);
-        }
+    gorunenHaberler.forEach((haber, index) => {
+        if (!konumluMu(haber)) return;
+        const anahtar = haberKonumAnahtari(haber, index);
+        markerOlustur(haber, konumlar.get(anahtar), anahtar);
     });
 }
 
-function markerOlustur(haber, gosterimKonumu = null, haberAnahtari = null) {
-    markerIkonlariniHazirla();
-
-    const ikon = MARKER_ICONS[haber.haber_turu] || MARKER_ICONS['trafik_kazasi'];
-    const konum = gosterimKonumu || { lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng };
-
+function markerOlustur(haber, gosterimKonumu, haberAnahtari) {
     const marker = new google.maps.Marker({
-        position: konum,
+        position: gosterimKonumu || { lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng },
         map,
-        icon: ikon,
+        icon: markerIkonu(haber.haber_turu),
         title: haber.baslik,
-        animation: google.maps.Animation.DROP
+        optimized: true,
     });
-
     marker.haberData = haber;
     marker.haberKey = haberAnahtari;
-
     marker.addListener('click', () => {
         infoWindowAc(marker, haber);
+        aktifKartiIsaretle(haberAnahtari, true);
     });
-
     markers.push(marker);
+}
+
+function konumluMu(haber) {
+    return !!(haber.koordinatlar && haber.koordinatlar.lat && haber.koordinatlar.lng);
 }
 
 function haberKonumAnahtari(haber, index) {
@@ -286,42 +265,27 @@ function koordinatGrupAnahtari(haber) {
     return `${Number(haber.koordinatlar.lat).toFixed(6)}|${Number(haber.koordinatlar.lng).toFixed(6)}`;
 }
 
+// Aynı koordinattaki haberleri küçük bir çember üzerine dağıt (üst üste binmesin)
 function cakisanMarkerKonumlariniHesapla(haberListesi) {
     const gruplar = new Map();
     const dagitim = new Map();
 
     haberListesi.forEach((haber, index) => {
-        if (!haber.koordinatlar || !haber.koordinatlar.lat || !haber.koordinatlar.lng) {
-            return;
-        }
-
-        const grupAnahtari = koordinatGrupAnahtari(haber);
-        if (!gruplar.has(grupAnahtari)) {
-            gruplar.set(grupAnahtari, []);
-        }
-
-        gruplar.get(grupAnahtari).push({
-            haber,
-            index,
-            anahtar: haberKonumAnahtari(haber, index),
-        });
+        if (!konumluMu(haber)) return;
+        const g = koordinatGrupAnahtari(haber);
+        if (!gruplar.has(g)) gruplar.set(g, []);
+        gruplar.get(g).push({ haber, anahtar: haberKonumAnahtari(haber, index) });
     });
 
     gruplar.forEach((grup) => {
         if (grup.length === 1) {
-            const tekil = grup[0];
-            dagitim.set(tekil.anahtar, {
-                lat: tekil.haber.koordinatlar.lat,
-                lng: tekil.haber.koordinatlar.lng,
-            });
+            const t = grup[0];
+            dagitim.set(t.anahtar, { lat: t.haber.koordinatlar.lat, lng: t.haber.koordinatlar.lng });
             return;
         }
-
-        grup.sort((a, b) => {
-            const aDeger = `${a.haber.tarih || ''}|${a.haber.baslik || ''}|${a.anahtar}`;
-            const bDeger = `${b.haber.tarih || ''}|${b.haber.baslik || ''}|${b.anahtar}`;
-            return aDeger.localeCompare(bDeger, 'tr');
-        });
+        grup.sort((a, b) =>
+            `${a.haber.tarih || ''}|${a.haber.baslik || ''}|${a.anahtar}`
+                .localeCompare(`${b.haber.tarih || ''}|${b.haber.baslik || ''}|${b.anahtar}`, 'tr'));
 
         const merkezLat = grup[0].haber.koordinatlar.lat;
         const merkezLng = grup[0].haber.koordinatlar.lng;
@@ -335,241 +299,300 @@ function cakisanMarkerKonumlariniHesapla(haberListesi) {
             });
         });
     });
-
     return dagitim;
 }
 
-function infoWindowAc(marker, haber) {
-    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
-    const tarih = haber.tarih ? tarihFormatla(haber.tarih) : 'Tarih bilinmiyor';
-    const kaynakSayisi = haber.kaynaklar ? haber.kaynaklar.length : 1;
-    const icerikOzet = haber.icerik ? haber.icerik.substring(0, 150) + (haber.icerik.length > 150 ? '...' : '') : '';
-
-    const konum = [];
+function konumMetni(haber) {
+    const k = [];
     if (haber.konum_bilgisi) {
-        if (haber.konum_bilgisi.ilce) konum.push(haber.konum_bilgisi.ilce);
-        if (haber.konum_bilgisi.mahalle) konum.push(haber.konum_bilgisi.mahalle);
+        if (haber.konum_bilgisi.ilce) k.push(haber.konum_bilgisi.ilce);
+        if (haber.konum_bilgisi.mahalle) k.push(haber.konum_bilgisi.mahalle);
     }
-    const konumMetni = konum.length > 0 ? konum.join(', ') : 'Kocaeli';
+    return k.length ? k.join(', ') : 'Kocaeli';
+}
 
-    // Tüm kaynakların linklerini oluştur (PDF: tüm kaynaklar listelenmelidir)
-    let kaynakLinksHtml = '';
-    if (haber.kaynaklar && haber.kaynaklar.length > 0) {
-        kaynakLinksHtml = haber.kaynaklar.map(k =>
-            `<a href="${escapeHtml(k.link || '#')}" target="_blank" rel="noopener"
-                style="display:block;text-align:center;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12.5px;font-weight:700;letter-spacing:0.3px;box-shadow:0 3px 8px rgba(99,102,241,0.25);margin-bottom:6px;">
-                ${escapeHtml(k.kaynak_adi || 'Kaynak')} &rarr; Habere Git
-            </a>`
-        ).join('');
-    } else {
-        const haberLinki = haber.haber_linki || '#';
-        kaynakLinksHtml = `<a href="${escapeHtml(haberLinki)}" target="_blank" rel="noopener"
-            style="display:block;text-align:center;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12.5px;font-weight:700;">
-            Habere Git &rarr;
-        </a>`;
-    }
+function infoWindowAc(marker, haber) {
+    const tur = turBilgisi(haber.haber_turu);
+    const tarih = haber.tarih ? tarihFormatla(haber.tarih) : 'Tarih yok';
+    const ozet = haber.icerik ? haber.icerik.substring(0, 160) + (haber.icerik.length > 160 ? '…' : '') : '';
 
-    const icerik = `
-        <div style="font-family:'Inter',sans-serif;max-width:330px;padding:4px;background:#151f30;">
-            <div style="font-size:15px;font-weight:700;color:#e2e8f0;margin-bottom:10px;line-height:1.45;letter-spacing:-0.2px;">
-                ${escapeHtml(haber.baslik)}
+    // Tüm kaynaklar listelenir (aynı haber birden çok sitede çıktıysa)
+    const kaynaklar = (haber.kaynaklar && haber.kaynaklar.length)
+        ? haber.kaynaklar
+        : [{ kaynak_adi: haber.kaynak_adi || 'Kaynak', link: haber.haber_linki }];
+    const linkler = kaynaklar.map(k => `
+        <a class="iw-link" href="${escapeHtml(k.link || '#')}" target="_blank" rel="noopener">
+            <span>${escapeHtml(k.kaynak_adi || 'Kaynak')} sitesinde oku</span>${svg(UI_IKON.dis)}
+        </a>`).join('');
+
+    infoWindow.setContent(`
+        <article class="iw" style="--c:${tur.color}">
+            <div class="iw-tur"><i></i>${escapeHtml(tur.label)}</div>
+            <h3>${escapeHtml(haber.baslik)}</h3>
+            <div class="iw-meta">
+                <span>${svg(UI_IKON.takvim)}${tarih}</span>
+                <span>${svg(UI_IKON.konum)}${escapeHtml(konumMetni(haber))}</span>
             </div>
-            <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:12.5px;color:#94a3b8;">
-                <span style="display:inline-block;padding:4px 12px;border-radius:8px;color:#fff;font-size:11.5px;font-weight:700;background:linear-gradient(135deg,${turBilgi.color},${turBilgi.color}dd);width:fit-content;letter-spacing:0.3px;box-shadow:0 2px 6px ${turBilgi.color}44;">
-                    ${turBilgi.icon} ${turBilgi.label}
-                </span>
-                <span>📅 ${tarih}</span>
-                <span>📍 ${escapeHtml(konumMetni)}</span>
-                ${kaynakSayisi > 1 ? `<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;">📡 ${kaynakSayisi} kaynakta</span>` : ''}
+            ${ozet ? `<p class="iw-ozet">${escapeHtml(ozet)}</p>` : ''}
+            <div class="iw-kaynaklar">
+                ${kaynaklar.length > 1 ? `<p>${kaynaklar.length} gazetede çıktı</p>` : ''}
+                ${linkler}
             </div>
-            ${icerikOzet ? `<div style="font-size:12.5px;color:#94a3b8;line-height:1.55;margin-bottom:12px;padding:8px 10px;background:#1a2740;border-radius:8px;border-left:3px solid ${turBilgi.color};">${escapeHtml(icerikOzet)}</div>` : ''}
-            ${kaynakLinksHtml}
-        </div>
-    `;
-
-    infoWindow.setContent(icerik);
-    infoWindow.open(map, marker);
+        </article>`);
+    infoWindow.open({ map, anchor: marker, shouldFocus: false });
 }
 
 function markerlariTemizle() {
-    markers.forEach(marker => marker.setMap(null));
+    markers.forEach(m => m.setMap(null));
     markers = [];
 }
 
-// ==================== FİLTRE İŞLEMLERİ ====================
-// Tüm filtrelemeler AJAX ile sayfa yenilenmeden (no-reload) yapılır.
-// Filtre değiştiğinde → filtreUygula() → haberleriGetir() → API çağrısı
-// → marker'lar ve haber listesi dinamik güncellenir
+function markeriVurgula(anahtar) {
+    markers.forEach(m => {
+        const aktif = m.haberKey === anahtar;
+        m.setIcon(markerIkonu(m.haberData.haber_turu, aktif));
+        m.setZIndex(aktif ? 1000 : null);
+    });
+}
+
+// ==================== FİLTRELER ====================
+// Tüm filtrelemeler AJAX ile sayfa yenilenmeden yapılır:
+// filtre değişir → filtreUygula() → API → marker'lar + liste + sayılar güncellenir.
 
 function filtreParametreleriOlustur() {
     const params = {};
-    const seciliTurler = [];
-    document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]:checked').forEach(cb => {
-        seciliTurler.push(cb.value);
-    });
-    const tumCheckboxlar = document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]');
-    if (seciliTurler.length < tumCheckboxlar.length && seciliTurler.length > 0) {
-        params.haber_turu = seciliTurler.join(',');
-    }
+    const tum = document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]');
+    const secili = [...tum].filter(cb => cb.checked).map(cb => cb.value);
+    // Hiçbiri seçili değilse API'ye var olmayan bir tür gönder → boş sonuç
+    if (secili.length === 0) params.haber_turu = '_yok_';
+    else if (secili.length < tum.length) params.haber_turu = secili.join(',');
+
     const ilce = document.getElementById('ilce-filtre').value;
     if (ilce) params.ilce = ilce;
-    const baslangic = document.getElementById('baslangic-tarihi').value;
-    const bitis = document.getElementById('bitis-tarihi').value;
-    if (baslangic) params.baslangic_tarihi = baslangic;
-    if (bitis) params.bitis_tarihi = bitis;
+    const bas = document.getElementById('baslangic-tarihi').value;
+    const bit = document.getElementById('bitis-tarihi').value;
+    if (bas) params.baslangic_tarihi = bas;
+    if (bit) params.bitis_tarihi = bit;
     return params;
 }
 
-function filtreUygula() { haberleriGetir(); }
+function filtreUygula() {
+    if (infoWindow) infoWindow.close();
+    aktifHaberAnahtari = null;
+    haberleriGetir();
+    istatistikleriGetir();
+}
 
 function filtreleriTemizle() {
     document.querySelectorAll('#haber-turu-filtre input[type="checkbox"]').forEach(cb => { cb.checked = true; });
     document.getElementById('ilce-filtre').value = '';
-    document.getElementById('baslangic-tarihi').value = '';
-    document.getElementById('bitis-tarihi').value = '';
+    document.getElementById('arama').value = '';
+    tarihKisayolu(0, false);
     filtreUygula();
 }
 
-// ==================== UI GÜNCELLEME ====================
+function yerelTarih(d) {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+// Hızlı tarih: 1 = bugün, 3/7 = son n gün, 0 = tümü
+function tarihKisayolu(gun, uygula = true) {
+    const bas = document.getElementById('baslangic-tarihi');
+    const bit = document.getElementById('bitis-tarihi');
+    if (gun === 0) {
+        bas.value = ''; bit.value = '';
+    } else {
+        const d = new Date();
+        d.setDate(d.getDate() - (gun - 1));
+        bas.value = yerelTarih(d);
+        bit.value = '';
+    }
+    segmentiIsaretle(gun);
+    if (uygula) filtreUygula();
+}
+
+function tarihElleDegisti() {
+    segmentiIsaretle(null);
+    filtreUygula();
+}
+
+function segmentiIsaretle(gun) {
+    document.querySelectorAll('.segmented button').forEach(b => {
+        b.setAttribute('aria-pressed', String(Number(b.dataset.gun) === gun));
+    });
+}
+
+// Başlık araması istemci tarafında: ağ isteği yok, anında sonuç
+function aramaYap() {
+    const q = document.getElementById('arama').value.trim().toLocaleLowerCase('tr');
+    gorunenHaberler = q
+        ? haberler.filter(h => (h.baslik || '').toLocaleLowerCase('tr').includes(q))
+        : haberler;
+
+    const konumlu = gorunenHaberler.filter(konumluMu).length;
+    document.getElementById('stat-toplam').textContent = gorunenHaberler.length;
+    document.getElementById('stat-konumlu').textContent = konumlu;
+
+    haberListesiniGuncelle(gorunenHaberler);
+    haritayiGuncelle();
+}
+
+// ==================== TÜR DAĞILIMI (chip sayıları + barlar) ====================
+
+function turDagilimiOlustur(dagilim) {
+    const max = Math.max(...Object.values(dagilim), 1);
+    document.querySelectorAll('[data-tur-sayi]').forEach(el => {
+        const sayi = dagilim[el.dataset.turSayi] || 0;
+        el.textContent = sayi;
+        el.closest('.chip').setAttribute('title', `${sayi} haber`);
+    });
+    document.querySelectorAll('[data-tur-bar]').forEach(el => {
+        el.style.width = `${((dagilim[el.dataset.turBar] || 0) / max) * 100}%`;
+    });
+}
 
 // ==================== SANAL LİSTE (VIRTUAL SCROLL) ====================
-// Binlerce haberi DOM'a eklemek yerine sadece görünür olanları render eder.
+// Binlerce haberi DOM'a basmak yerine sadece görünür kartlar çizilir.
 
-const KART_YUKSEKLIGI = 78; // px — ortalama kart yüksekliği
-let _virtualListesi = [];
+const KART_YUKSEKLIGI = 88; // px — .haber-card yüksekliği (84) + 4 boşluk
 let _scrollHandler = null;
 
 function haberKartiHtml(haber, index) {
-    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '📰', label: 'Diğer' };
-    const tarih = haber.tarih ? tarihFormatla(haber.tarih) : '';
-    const kaynak = haber.kaynak_adi || (haber.kaynaklar && haber.kaynaklar.length > 0 ? haber.kaynaklar[0].kaynak_adi : '');
+    const tur = turBilgisi(haber.haber_turu);
+    const tarih = haber.tarih ? tarihFormatla(haber.tarih, true) : '';
+    const kaynak = haber.kaynak_adi || (haber.kaynaklar && haber.kaynaklar[0] ? haber.kaynaklar[0].kaynak_adi : '');
     const kaynakSayisi = haber.kaynaklar ? haber.kaynaklar.length : 1;
-    const multiSourceBadge = kaynakSayisi > 1
-        ? `<span class="multi-source-badge">📡 ${kaynakSayisi} kaynak</span>`
-        : '';
-    return `<div class="haber-card" style="border-left-color:${turBilgi.color};position:absolute;left:0;right:0;top:${index * KART_YUKSEKLIGI}px"
-             onclick="habereTikla(${index})" title="${escapeHtml(haber.baslik)}">
-        <div class="haber-card-title">${escapeHtml(haber.baslik)}</div>
-        <div class="haber-card-meta">
-            <span class="haber-card-tag" style="background-color:${turBilgi.color}">${turBilgi.icon} ${turBilgi.label}</span>
-            ${multiSourceBadge}
-            ${tarih ? `<span>📅 ${tarih}</span>` : ''}
-            ${kaynak ? `<span>📰 ${escapeHtml(kaynak)}</span>` : ''}
-        </div>
-    </div>`;
+    const anahtar = haberKonumAnahtari(haber, index);
+    const ilce = haber.konum_bilgisi && haber.konum_bilgisi.ilce;
+
+    return `<button type="button" role="listitem" class="haber-card" style="--c:${tur.color};top:${index * KART_YUKSEKLIGI}px"
+                ${konumluMu(haber) ? '' : 'data-konumsuz'}
+                aria-current="${anahtar === aktifHaberAnahtari}"
+                onclick="habereTikla(${index})">
+        <span class="haber-card-title">${escapeHtml(haber.baslik)}</span>
+        <span class="haber-card-meta">
+            <span class="tur">${escapeHtml(tur.label)}</span>
+            ${ilce ? `<span>${escapeHtml(ilce)}</span>` : ''}
+            ${tarih ? `<span>${tarih}</span>` : ''}
+            ${kaynakSayisi > 1
+                ? `<span class="multi">${svg(UI_IKON.yayin)}${kaynakSayisi} gazete</span>`
+                : (kaynak ? `<span>${escapeHtml(kaynak)}</span>` : '')}
+        </span>
+    </button>`;
 }
 
-function haberListesiniGuncelle(haberListesi) {
-    _virtualListesi = haberListesi;
-    const container = document.getElementById('haber-listesi');
-
-    if (haberListesi.length === 0) {
-        container.innerHTML = '<p class="loading-text">Gösterilecek haber bulunamadı.</p>';
-        container.style.position = '';
-        container.style.height = '';
-        container.style.overflowY = '';
-        if (_scrollHandler) {
-            container.removeEventListener('scroll', _scrollHandler);
-            _scrollHandler = null;
-        }
+function listeDurumu(durum) {
+    const c = document.getElementById('haber-listesi');
+    c.style.height = '';
+    if (durum === 'hata') {
+        c.innerHTML = `<div class="list-state"><strong>Haberler alınamadı</strong>Sunucu ya da MongoDB yanıt vermiyor. İkisinin de çalıştığını kontrol edip tekrar dene.
+            <button type="button" class="btn btn-ghost" onclick="filtreUygula()">Tekrar dene</button></div>`;
         return;
     }
+    const arama = document.getElementById('arama').value.trim();
+    const filtreli = Object.keys(filtreParametreleriOlustur()).length > 0;
+    c.innerHTML = arama
+        ? `<div class="list-state"><strong>Başlığında "${escapeHtml(arama)}" geçen haber yok</strong>Başka bir kelime dene ya da aramayı temizle.
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('arama').value='';aramaYap()">Aramayı temizle</button></div>`
+        : filtreli
+        ? `<div class="list-state"><strong>Bu filtrelerle haber yok</strong>Tarih aralığını genişlet ya da başka türleri de seç.
+            <button type="button" class="btn btn-ghost" onclick="filtreleriTemizle()">Filtreleri sıfırla</button></div>`
+        : `<div class="list-state"><strong>Henüz haber yok</strong>Yerel gazetelerden son 3 günün haberlerini çekmek için güncelle.
+            <button type="button" class="btn btn-primary" onclick="scrapingBaslat()">Haberleri güncelle</button></div>`;
+}
 
-    const toplamYukseklik = haberListesi.length * KART_YUKSEKLIGI;
-    container.style.position = 'relative';
-    container.style.height = toplamYukseklik + 'px';
-    container.style.overflowY = 'auto';
-
-    // İç scroll alanı
-    const scrollParent = container.closest('.sidebar-section') || container.parentElement;
-
-    function render() {
-        const scrollTop = scrollParent.scrollTop || 0;
-        const goruntulenenYukseklik = scrollParent.clientHeight || 600;
-        const tampon = goruntulenenYukseklik; // üst+alt tampon
-        const baslangic = Math.max(0, Math.floor((scrollTop - tampon) / KART_YUKSEKLIGI));
-        const bitis = Math.min(
-            haberListesi.length - 1,
-            Math.ceil((scrollTop + goruntulenenYukseklik + tampon) / KART_YUKSEKLIGI)
-        );
-
-        let html = '';
-        for (let i = baslangic; i <= bitis; i++) {
-            html += haberKartiHtml(haberListesi[i], i);
-        }
-        container.innerHTML = html;
-    }
-
-    render();
+function haberListesiniGuncelle(liste) {
+    const container = document.getElementById('haber-listesi');
+    const scrollParent = document.getElementById('list-scroll');
 
     if (_scrollHandler) {
-        (container.closest('.sidebar-section') || container.parentElement)
-            .removeEventListener('scroll', _scrollHandler);
+        scrollParent.removeEventListener('scroll', _scrollHandler);
+        _scrollHandler = null;
     }
+    if (liste.length === 0) { listeDurumu('bos'); return; }
+
+    container.style.height = (liste.length * KART_YUKSEKLIGI) + 'px';
+    scrollParent.scrollTop = 0;
+
+    function render() {
+        const top = scrollParent.scrollTop;
+        const yuk = scrollParent.clientHeight || 600;
+        const bas = Math.max(0, Math.floor((top - yuk) / KART_YUKSEKLIGI));
+        const bit = Math.min(liste.length - 1, Math.ceil((top + yuk * 2) / KART_YUKSEKLIGI));
+        let html = '';
+        for (let i = bas; i <= bit; i++) html += haberKartiHtml(liste[i], i);
+        container.innerHTML = html;
+    }
+    render();
     _scrollHandler = render;
     scrollParent.addEventListener('scroll', _scrollHandler, { passive: true });
 }
 
-function habereTikla(index) {
-    const haber = haberler[index];
-    if (!haber) return;
-    if (haber.koordinatlar && haber.koordinatlar.lat && haber.koordinatlar.lng) {
-        const haberAnahtari = haberKonumAnahtari(haber, index);
-        const marker = markers.find(m => m.haberKey === haberAnahtari);
-        const hedefKonum = marker ? marker.getPosition() : { lat: haber.koordinatlar.lat, lng: haber.koordinatlar.lng };
-        map.panTo(hedefKonum);
-        map.setZoom(14);
-        if (marker) {
-            infoWindowAc(marker, haber);
-            marker.setAnimation(google.maps.Animation.BOUNCE);
-            setTimeout(() => marker.setAnimation(null), 1500);
+function aktifKartiIsaretle(anahtar, kaydir = false) {
+    aktifHaberAnahtari = anahtar;
+    if (map) markeriVurgula(anahtar);
+    const idx = gorunenHaberler.findIndex((h, i) => haberKonumAnahtari(h, i) === anahtar);
+    if (kaydir && idx >= 0) {
+        const sp = document.getElementById('list-scroll');
+        const y = idx * KART_YUKSEKLIGI;
+        if (y < sp.scrollTop || y > sp.scrollTop + sp.clientHeight - KART_YUKSEKLIGI) {
+            sp.scrollTo({ top: Math.max(0, y - KART_YUKSEKLIGI), behavior: 'smooth' });
         }
-    } else {
-        bildirimGoster('Bu haberin konum bilgisi bulunamadı', 'uyari');
     }
+    if (_scrollHandler) _scrollHandler();
 }
 
-function turDagilimiOlustur(dagilim) {
-    const container = document.getElementById('tur-dagilimi');
-    if (!dagilim || Object.keys(dagilim).length === 0) { container.innerHTML = ''; return; }
-    const maxDeger = Math.max(...Object.values(dagilim), 1);
-    let html = '';
-    for (const [turId, sayi] of Object.entries(dagilim)) {
-        const turBilgi = CONFIG.newsTypes[turId] || { color: '#6B7280', icon: '📰', label: turId };
-        const yuzde = (sayi / maxDeger) * 100;
-        html += `
-            <div class="tur-bar">
-                <span class="tur-bar-label">${turBilgi.icon} ${turBilgi.label}</span>
-                <div class="tur-bar-track">
-                    <div class="tur-bar-fill" style="width: ${yuzde}%; background-color: ${turBilgi.color}"></div>
-                </div>
-                <span class="tur-bar-count">${sayi}</span>
-            </div>
-        `;
-    }
-    container.innerHTML = html;
+function habereTikla(index) {
+    const haber = gorunenHaberler[index];
+    if (!haber) return;
+    if (!konumluMu(haber)) { bildirimGoster('Bu haberde konum bulunamadı, haritada gösterilemiyor.', 'uyari'); return; }
+    if (!map) { bildirimGoster('Harita yüklenmediği için konum gösterilemiyor.', 'uyari'); return; }
+
+    const anahtar = haberKonumAnahtari(haber, index);
+    const marker = markers.find(m => m.haberKey === anahtar);
+    map.panTo(marker ? marker.getPosition() : haber.koordinatlar);
+    if (map.getZoom() < 14) map.setZoom(14);
+    if (marker) infoWindowAc(marker, haber);
+    aktifKartiIsaretle(anahtar);
+
+    // Telefonda paneli kapat ki harita görünsün
+    if (window.matchMedia('(max-width: 820px)').matches) paneliAcKapa(false);
 }
 
-// ==================== YARDIMCI FONKSİYONLAR ====================
+// ==================== MOBİL PANEL ====================
 
-function loadingGoster(goster) {
-    document.getElementById('loading-overlay').style.display = goster ? 'flex' : 'none';
+function paneliAcKapa(zorla) {
+    const panel = document.getElementById('panel');
+    const acik = typeof zorla === 'boolean' ? zorla : panel.dataset.open !== 'true';
+    panel.dataset.open = String(acik);
+    document.getElementById('panel-handle').setAttribute('aria-expanded', String(acik));
 }
+document.querySelector('.brand').addEventListener('click', () => {
+    if (window.matchMedia('(max-width: 820px)').matches) paneliAcKapa();
+});
+
+// ==================== YARDIMCILAR ====================
 
 function bildirimGoster(mesaj, tip = 'basarili') {
-    const bildirim = document.getElementById('bildirim');
-    bildirim.textContent = mesaj;
-    bildirim.className = `bildirim ${tip}`;
-    bildirim.style.display = 'block';
-    setTimeout(() => { bildirim.style.display = 'none'; }, 5000);
+    const kutu = document.getElementById('toasts');
+    const t = document.createElement('div');
+    t.className = `toast ${tip}`;
+    t.textContent = mesaj;
+    kutu.appendChild(t);
+    while (kutu.children.length > 3) kutu.firstElementChild.remove();
+    setTimeout(() => {
+        t.classList.add('cikis');
+        t.addEventListener('animationend', () => t.remove(), { once: true });
+    }, 5000);
 }
 
-function tarihFormatla(tarihStr) {
-    try {
-        const tarih = new Date(tarihStr);
-        if (isNaN(tarih.getTime())) return tarihStr;
-        return tarih.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { return tarihStr; }
+function tarihFormatla(tarihStr, kisa = false) {
+    const tarih = new Date(tarihStr);
+    if (isNaN(tarih.getTime())) return tarihStr;
+    return tarih.toLocaleDateString('tr-TR', kisa
+        ? { day: 'numeric', month: 'short' }
+        : { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function escapeHtml(text) {
@@ -579,75 +602,59 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ==================== HABER DETAY PANELİ ====================
+// ==================== HABER TABLOSU (dialog) ====================
 
 async function haberDetayPaneliAc() {
     const modal = document.getElementById('haber-detay-modal');
     const tbody = document.getElementById('haber-tablo-body');
-    modal.style.display = 'flex';
-    tbody.innerHTML = '<tr><td colspan="6" class="tablo-yukleniyor">Yükleniyor...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="tablo-durum">Yükleniyor…</td></tr>';
+    modal.showModal();
 
     try {
         const params = filtreParametreleriOlustur();
         params.sadece_konumlu = 'false';
         params.limit = 500;
         params._ts = Date.now();
-        const queryString = new URLSearchParams(params).toString();
-        const response = await fetch(`/api/haberler?${queryString}`, { cache: 'no-store' });
-        const data = await response.json();
+        const data = await (await fetch(`/api/haberler?${new URLSearchParams(params)}`, { cache: 'no-store' })).json();
 
-        if (data.basarili && data.haberler.length > 0) {
-            document.getElementById('modal-haber-sayisi').textContent = `${data.haberler.length} haber`;
-            tbody.innerHTML = data.haberler.map(haber => haberTabloSatiri(haber)).join('');
-        } else {
-            tbody.innerHTML = '<tr><td colspan="6" class="tablo-yukleniyor">Haber bulunamadi.</td></tr>';
-            document.getElementById('modal-haber-sayisi').textContent = '0 haber';
-        }
+        const liste = data.basarili ? data.haberler : [];
+        document.getElementById('modal-haber-sayisi').textContent =
+            `${liste.length} haber, konumu bulunamayanlar dahil`;
+        tbody.innerHTML = liste.length
+            ? liste.map(haberTabloSatiri).join('')
+            : '<tr><td colspan="6" class="tablo-durum">Bu filtrelerle haber yok.</td></tr>';
     } catch (error) {
-        console.error('Haber detay paneli hatasi:', error);
-        tbody.innerHTML = '<tr><td colspan="6" class="tablo-yukleniyor">Veriler yuklenirken hata olustu.</td></tr>';
+        console.error('Haber tablosu hatası:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="tablo-durum">Haberler alınamadı. Sunucunun çalıştığını kontrol et.</td></tr>';
     }
 }
 
 function haberTabloSatiri(haber) {
-    const turBilgi = CONFIG.newsTypes[haber.haber_turu] || { color: '#6B7280', icon: '?', label: 'Bilinmiyor' };
-    const tarih = haber.tarih ? tarihFormatla(haber.tarih) : '-';
-    const kaynak = haber.kaynak_adi || '-';
-    const ilce = (haber.konum_bilgisi && haber.konum_bilgisi.ilce) ? haber.konum_bilgisi.ilce : '-';
-    const link = haber.haber_linki || '#';
+    const tur = turBilgisi(haber.haber_turu);
+    const tarih = haber.tarih ? tarihFormatla(haber.tarih) : '–';
+    const ilce = haber.konum_bilgisi && haber.konum_bilgisi.ilce ? haber.konum_bilgisi.ilce : '–';
 
-    // Diger kaynaklar satiri
     let cokluKaynak = '';
     if (haber.kaynaklar && haber.kaynaklar.length > 1) {
-        const digerler = haber.kaynaklar.slice(1).map(k =>
-            `<a href="${escapeHtml(k.link || '#')}" target="_blank" rel="noopener" style="color:#6366f1;">${escapeHtml(k.kaynak_adi)}</a>`
-        ).join(', ');
-        cokluKaynak = `<div class="tablo-coklu-kaynak">+ ${digerler}</div>`;
+        cokluKaynak = `<div class="tablo-coklu-kaynak">ayrıca ${haber.kaynaklar.slice(1).map(k =>
+            `<a href="${escapeHtml(k.link || '#')}" target="_blank" rel="noopener">${escapeHtml(k.kaynak_adi)}</a>`).join(', ')}</div>`;
     }
 
-    return `<tr>
-        <td><span class="tablo-tur-badge" style="background:${turBilgi.color}">${turBilgi.icon} ${turBilgi.label}</span></td>
+    return `<tr style="--c:${tur.color}">
+        <td><span class="tablo-tur"><i></i>${escapeHtml(tur.label)}</span></td>
         <td class="tablo-baslik">${escapeHtml(haber.baslik)}</td>
-        <td class="tablo-kaynak">${escapeHtml(kaynak)}${cokluKaynak}</td>
+        <td class="tablo-kaynak">${escapeHtml(haber.kaynak_adi || '–')}${cokluKaynak}</td>
         <td class="tablo-ilce">${escapeHtml(ilce)}</td>
         <td class="tablo-tarih">${tarih}</td>
-        <td><a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="tablo-link-btn">Habere Git &rarr;</a></td>
+        <td><a href="${escapeHtml(haber.haber_linki || '#')}" target="_blank" rel="noopener" class="tablo-link">Haberi aç${svg(UI_IKON.dis)}</a></td>
     </tr>`;
 }
 
 function haberDetayPaneliKapat() {
-    document.getElementById('haber-detay-modal').style.display = 'none';
+    document.getElementById('haber-detay-modal').close();
 }
 
+// Dialog dışına (backdrop'a) tıklayınca kapat. Esc'yi <dialog> zaten yönetir.
 function modalDisindaTikla(event) {
-    if (event.target === event.currentTarget) {
-        haberDetayPaneliKapat();
-    }
+    if (event.target === event.currentTarget) haberDetayPaneliKapat();
 }
-
-// ESC tusu ile modal kapatma
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        haberDetayPaneliKapat();
-    }
-});
