@@ -352,11 +352,15 @@ class MongoDB:
             toplam_haber = self.news_collection.count_documents(temel_filtre)
             konumlu_haber = self.news_collection.count_documents(konumlu_filtre)
 
-            # Haber türlerine göre dağılım
+            # Haber türlerine göre dağılım: haritadakiler ve konumsuzlar dahil tümü
             tur_dagilimi = {}
+            tur_dagilimi_tumu = {}
             for tur in Config.NEWS_TYPES:
                 tur_dagilimi[tur] = self.news_collection.count_documents(
                     {**konumlu_filtre, "haber_turu": tur}
+                )
+                tur_dagilimi_tumu[tur] = self.news_collection.count_documents(
+                    {**temel_filtre, "haber_turu": tur}
                 )
 
             # Kaynak sitelere göre dağılım
@@ -372,6 +376,7 @@ class MongoDB:
                 "toplam_haber": toplam_haber,
                 "konumlu_haber": konumlu_haber,
                 "tur_dagilimi": tur_dagilimi,
+                "tur_dagilimi_tumu": tur_dagilimi_tumu,
                 "kaynak_dagilimi": kaynak_dagilimi,
             }
         except Exception as e:

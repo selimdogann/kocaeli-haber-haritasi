@@ -11,6 +11,14 @@ Yazılım Laboratuvarı-II | Proje I
 
 Bu proje, Kocaeli yerel haber sitelerinden belirlenen haber türlerine ait haberlerin web ortamından otomatik olarak toplanmasını, işlenmesini ve Google Maps üzerinde görselleştirilmesini sağlayan bir sistemdir.
 
+## 📸 Ekran Görüntüleri
+
+![Harita ve haber detayı](docs/ekran-goruntuleri/harita.png)
+
+| Tüm haberler tablosu | Telefon |
+|---|---|
+| ![Tablo](docs/ekran-goruntuleri/tablo.png) | <img src="docs/ekran-goruntuleri/mobil.png" width="280" alt="Telefon görünümü"> |
+
 ## 🏗️ Mimari
 
 ```

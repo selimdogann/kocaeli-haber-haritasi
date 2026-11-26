@@ -171,6 +171,8 @@ def test_istatistikler(client):
     assert ist["tur_dagilimi"]["yangin"] == 1
     assert ist["tur_dagilimi"]["kulturel_etkinlik"] == 1
     assert ist["tur_dagilimi"]["asayis"] == 0  # tek asayiş haberi konumsuz
+    assert ist["tur_dagilimi_tumu"]["asayis"] == 1   # konumsuzlar dahil sayım
+    assert ist["tur_dagilimi_tumu"]["trafik_kazasi"] == 1
 
 
 def test_istatistik_ilce_filtresi(client):

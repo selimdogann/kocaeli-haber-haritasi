@@ -149,6 +149,9 @@ function markerIkonu(turId, aktif = false) {
 async function haberleriGetir() {
     try {
         const params = filtreParametreleriOlustur();
+        // Liste konumsuz haberleri de gösterir (soluk); harita sadece konumluları çizer
+        params.sadece_konumlu = 'false';
+        params.limit = 500;
         params._ts = Date.now();
         const response = await fetch(`/api/haberler?${new URLSearchParams(params)}`, { cache: 'no-store' });
         const data = await response.json();
@@ -171,7 +174,10 @@ async function istatistikleriGetir() {
         params._ts = Date.now();
         const response = await fetch(`/api/istatistikler?${new URLSearchParams(params)}`, { cache: 'no-store' });
         const data = await response.json();
-        if (data.basarili) turDagilimiOlustur(data.istatistikler.tur_dagilimi || {});
+        if (data.basarili) {
+            const ist = data.istatistikler;
+            turDagilimiOlustur(ist.tur_dagilimi_tumu || ist.tur_dagilimi || {});
+        }
     } catch (error) {
         console.error('İstatistikler yüklenirken hata:', error);
     }
