@@ -109,6 +109,24 @@ Uygulama `.env` içindeki `FLASK_PORT` ile çalışır (varsayılan `http://loca
 
 Harita için `.env` dosyasına `GOOGLE_MAPS_API_KEY` girilmelidir. Anahtar yoksa liste ve filtreler çalışır, harita alanında uyarı görünür.
 
+## 🧪 Testler
+
+```bash
+pip install -r requirements-dev.txt
+pytest                 # internetsiz testler (sınıflandırma, scraper ayrıştırma, konum, API)
+pytest --canli         # + 5 haber sitesine gerçekten bağlanan testler
+```
+
+- API testleri ayrı bir `kocaeli_haber_test` veritabanı kullanır; MongoDB çalışmıyorsa atlanır.
+- Canlı testler her kaynaktan link toplanabildiğini, başlık/içerik/tarih çıkarıldığını ve linkin doğru habere gittiğini kontrol eder.
+
+## ⚠️ Scraping notları
+
+- Haber siteleri Cloudflare bot koruması kullanıyor. Kısa sürede çok istek atılırsa IP geçici olarak engellenir.
+- Bu yüzden varsayılanlar kibar tutuldu: kaynak başına 2 paralel istek, istekler arası 1 sn (`SCRAPER_MAX_WORKERS`, `REQUEST_DELAY`).
+- Veritabanında zaten olan haberlerin sayfası tekrar indirilmez.
+- Bir site engellerse o kaynak o çalıştırmada atlanır ve arayüzde bildirim çıkar.
+
 ## 📁 Proje Yapısı
 
 ```

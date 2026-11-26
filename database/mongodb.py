@@ -141,10 +141,15 @@ class MongoDB:
             bool: Ekleme başarılı ise True
         """
         try:
+            # Aynı link ikinci kez eklenmez ($addToSet, benzerlik oranı farklıysa
+            # aynı linki tekrar ekleyebildiği için link üzerinden kontrol edilir).
             sonuc = self.news_collection.update_one(
-                {"haber_linki": haber_linki},
                 {
-                    "$addToSet": {"diger_kaynaklar": yeni_kaynak},
+                    "haber_linki": haber_linki,
+                    "diger_kaynaklar.link": {"$ne": yeni_kaynak.get("link")},
+                },
+                {
+                    "$push": {"diger_kaynaklar": yeni_kaynak},
                     "$set": {"guncelleme_tarihi": datetime.now()},
                 },
             )

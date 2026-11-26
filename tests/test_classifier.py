@@ -138,3 +138,29 @@ def test_tr_kucuk_harf(girdi, beklenen):
 
 def test_buyuk_harfli_baslik_eslesir(siniflandirici):
     assert tur(siniflandirici, "İZMİT'TE KORKUTAN YANGIN") == "yangin"
+
+
+# ------------------------------------------------------------ hariç ifadeler
+@pytest.mark.parametrize("baslik, icerik", [
+    ("Belediyenin ihalesi yeniden değerlendirilecek",
+     "35 adet yangın söndürme tankeri alımı için yapılan ihaleye itiraz sonuçlandı."),
+    ("Okulda deprem ve yangın tatbikatı yapıldı", "Öğrenciler tahliye edildi."),
+    ("Kadın Platformu'ndan 25 Kasım yürüyüşü",
+     "Platform kadın cinayetlerine ve şiddete karşı mücadele çağrısı yaptı."),
+])
+def test_haric_ifadeler_tur_atamaz(siniflandirici, baslik, icerik):
+    assert tur(siniflandirici, baslik, icerik) is None
+
+
+def test_cinayet_buro_tek_basina_asayis_degil(siniflandirici):
+    sonuc = tur(siniflandirici, "Kayıp yaşlı adamdan 13 gündür haber yok",
+                "Arama çalışmaları sürerken Cinayet Büro ekipleri incelemeye başladı.")
+    assert sonuc is None
+
+
+def test_haric_ifade_gercek_olayi_engellemez(siniflandirici):
+    # Hem tatbikat hem gerçek yangın geçiyorsa yangın olarak kalmalı
+    assert tur(siniflandirici, "Fabrikada yangın çıktı",
+               "Geçen ay yangın tatbikatı yapılan fabrikada bu sabah yangın çıktı.") == "yangin"
+    # Tekil "kadın cinayeti" bir olay haberidir
+    assert tur(siniflandirici, "Gölcük'te kadın cinayeti", "Eşini öldüren şüpheli tutuklandı.") == "asayis"

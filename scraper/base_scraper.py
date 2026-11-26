@@ -139,6 +139,8 @@ class BaseScraper(ABC):
         Returns:
             BeautifulSoup: Ayrıştırılmış HTML nesnesi veya None
         """
+        if self.engellendi:
+            return None
         if self.CLOUDFLARE_KORUMALI:
             return self._sayfa_getir_playwright(url)
         return self._sayfa_getir_requests(url)
@@ -435,9 +437,13 @@ class BaseScraper(ABC):
         """
         pass
 
-    def tum_haberleri_cek(self) -> list:
+    def tum_haberleri_cek(self, atlanacak_linkler: set = None) -> list:
         """
         Kaynaktaki tüm güncel haberleri çeker.
+
+        Args:
+            atlanacak_linkler: Veritabanında zaten olan linkler. Bunların detay
+                sayfası hiç indirilmez (siteye gereksiz yük ve bot engeli riski).
 
         Returns:
             list: Haber sözlükleri listesi
@@ -447,6 +453,10 @@ class BaseScraper(ABC):
 
         try:
             haber_linkleri = self.haber_listesi_getir()
+            if atlanacak_linkler:
+                once = len(haber_linkleri)
+                haber_linkleri = [l for l in haber_linkleri if l not in atlanacak_linkler]
+                logger.info(f"{self.kaynak_adi} - {once - len(haber_linkleri)} link zaten kayıtlı, atlandı.")
 
             # Performans için kaynak başına üst sınır uygula
             max_link = getattr(Config, "SCRAPER_MAX_LINKS_PER_SOURCE", 50)

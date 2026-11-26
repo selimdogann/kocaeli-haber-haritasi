@@ -28,7 +28,7 @@ ORNEK_HABER_LINKI = {
     CagdasKocaeliScraper: "https://www.cagdaskocaeli.com.tr/haber/29224468/ornek-haber",
     OzgurKocaeliScraper: "https://www.ozgurkocaeli.com.tr/haber/29227766/ornek-haber",
     SesKocaeliScraper: "https://www.seskocaeli.com/haber/12345/ornek-haber",
-    YeniKocaeliScraper: "https://www.yenikocaeli.com/haber/guncel/ornek-haber/123456.html",
+    YeniKocaeliScraper: "https://www.yenikocaeli.com/haber/29230957/ornek-haber",
     BizimYakaScraper: "https://www.bizimyaka.com/haber/12345/ornek-haber",
 }
 
@@ -91,7 +91,7 @@ def test_haber_listesi_linkleri_toplar_ve_suzer(cls, monkeypatch):
     (CagdasKocaeliScraper, "haber-metni"),
     (OzgurKocaeliScraper, "haber-metni"),
     (SesKocaeliScraper, "detail-content"),
-    (YeniKocaeliScraper, "news-detail-content"),
+    (YeniKocaeliScraper, "post-text"),
     (BizimYakaScraper, "detail-content"),
 ])
 def test_haber_detay_baslik_icerik_tarih(cls, govde_sinifi, monkeypatch):
@@ -112,7 +112,7 @@ def test_haber_detay_baslik_icerik_tarih(cls, govde_sinifi, monkeypatch):
     (CagdasKocaeliScraper, "haber-metni"),
     (OzgurKocaeliScraper, "haber-metni"),
     (SesKocaeliScraper, "detail-content"),
-    (YeniKocaeliScraper, "news-detail-content"),
+    (YeniKocaeliScraper, "post-text"),
     (BizimYakaScraper, "detail-content"),
 ])
 def test_yorum_ve_paylasim_icerige_karismaz(cls, govde_sinifi, monkeypatch):
@@ -230,3 +230,36 @@ def test_normal_403_engel_sayilmaz(monkeypatch):
     monkeypatch.setattr(s.session, "get", lambda url, timeout: _SahteYanit(404))
     assert s.sayfa_getir(f"{s.base_url}/yok") is None
     assert s.engellendi is False
+
+
+def test_yeni_kocaeli_itemprop_tarihi(monkeypatch):
+    # Yeni Kocaeli tarihi <meta itemprop="datePublished"> içinde veriyor
+    s = YeniKocaeliScraper()
+    html = detay_html("x", "post-text").replace(
+        '<meta property="article:published_time" content="x">',
+        '<meta itemprop="datePublished" content="2026-11-26T17:54:00+03:00">',
+    )
+    monkeypatch.setattr(s, "sayfa_getir", lambda url: soup(html))
+    assert s.haber_detay_getir(ORNEK_HABER_LINKI[YeniKocaeliScraper])["yayin_tarihi"] == datetime(2026, 11, 26, 17, 54)
+
+
+def test_kayitli_linklerin_detayi_indirilmez(monkeypatch):
+    s = CagdasKocaeliScraper()
+    yeni, kayitli = f"{s.base_url}/haber/1/yeni", f"{s.base_url}/haber/2/kayitli"
+    monkeypatch.setattr(s, "haber_listesi_getir", lambda: [yeni, kayitli])
+    indirilen = []
+
+    def detay(url):
+        indirilen.append(url)
+        return {"baslik": "x", "icerik": "...", "yayin_tarihi": datetime.now()}
+
+    monkeypatch.setattr(s, "haber_detay_getir", detay)
+    s.tum_haberleri_cek(atlanacak_linkler={kayitli})
+    assert indirilen == [yeni]
+
+
+def test_engelli_kaynak_hic_istek_atmaz(monkeypatch):
+    s = OzgurKocaeliScraper()      # Playwright yolu olan kaynak
+    s.engellendi = True
+    monkeypatch.setattr(s, "_sayfa_getir_playwright", lambda url: pytest.fail("istek atılmamalı"))
+    assert s.sayfa_getir(f"{s.base_url}/haber/1/x") is None

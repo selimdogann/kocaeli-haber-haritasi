@@ -202,3 +202,13 @@ def test_temizle_dogru_anahtarla(client):
     yanit = client.post("/api/temizle", headers={"Authorization": f"Bearer {Config.ADMIN_API_KEY}"})
     assert yanit.status_code == 200
     assert client.get("/api/haberler").get_json()["haberler"] == []
+
+
+def test_ayni_kaynak_linki_iki_kez_eklenmez(client):
+    db = MongoDB()
+    ana = ORNEK_HABERLER[0]["haber_linki"]
+    kaynak = {"site_adi": "Özgür Kocaeli", "link": "https://www.ozgurkocaeli.com.tr/haber/5/x"}
+    assert db.haber_kaynak_ekle(ana, {**kaynak, "benzerlik_orani": 0.91}) is True
+    assert db.haber_kaynak_ekle(ana, {**kaynak, "benzerlik_orani": 0.88}) is False
+    kayit = db.news_collection.find_one({"haber_linki": ana})
+    assert [k["link"] for k in kayit["diger_kaynaklar"]] == [kaynak["link"]]

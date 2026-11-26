@@ -2,8 +2,9 @@
 Kocaeli Haber Haritası - Yeni Kocaeli Scraper
 
 Kaynak: https://www.yenikocaeli.com
-Platform: Özel CMS (PHP tabanlı)
-URL yapısı: /haber/{kategori}/{slug}/{id}.html
+Platform: Daktilo benzeri CMS (Kasım 2026'da eski PHP yapısından geçildi;
+eski /haber/{kategori}.html adresleri artık 410 Gone döndürüyor)
+URL yapısı: /haber/{id}/{slug}
 """
 
 import re
@@ -21,23 +22,24 @@ class YeniKocaeliScraper(BaseScraper):
             kaynak_adi="Yeni Kocaeli",
             base_url="https://www.yenikocaeli.com",
         )
-        self.timeout = 5  # Bu site sık timeout veriyor, kısa tut
-        # Gerçek kategori sayfaları (footer'dan alındı)
+        self.timeout = 15  # Sayfalar büyük (~150 KB); 5 sn yetmeyebiliyor
+        # Kategori sayfaları (ana sayfa menüsünden, 2026-11-26)
         self.kategori_urls = [
-            f"{self.base_url}/haber/guncel.html",
-            f"{self.base_url}/haber/polis-adliye.html",
-            f"{self.base_url}/haber/siyaset.html",
-            f"{self.base_url}/haber/yasam.html",
-            f"{self.base_url}/haber/ekonomi.html",
-            f"{self.base_url}/haber/saglik.html",
+            f"{self.base_url}/kocaeli-haber",
+            f"{self.base_url}/asayis",
+            f"{self.base_url}/yasam",
+            f"{self.base_url}/kultur-sanat",
+            f"{self.base_url}/ekonomi",
+            f"{self.base_url}/siyaset",
+            f"{self.base_url}/saglik",
         ]
 
     def _haber_linki_mi(self, href: str) -> bool:
         """Verilen linkin bir haber detay sayfası olup olmadığını kontrol eder."""
         if not href:
             return False
-        # Yeni Kocaeli URL formatı: /haber/{kategori}/{slug}/{id}.html
-        return bool(re.search(r'/haber/[^/]+/[^/]+/\d+\.html', href))
+        # Yeni Kocaeli URL formatı: /haber/{id}/{slug}
+        return bool(re.search(r'/haber/\d+/', href))
 
     def haber_listesi_getir(self) -> list:
         """Yeni Kocaeli'den haber linklerini çeker."""
@@ -89,6 +91,7 @@ class YeniKocaeliScraper(BaseScraper):
 
             # İçerik — birden fazla seçici dene
             icerik_seciciler = [
+                ".post-text",
                 ".news-detail-content", ".detail-content",
                 ".news-content", ".content-text",
                 ".post-content", ".entry-content", ".article-body",
@@ -115,6 +118,8 @@ class YeniKocaeliScraper(BaseScraper):
 
             # Tarih — meta tag öncelikli
             meta_tarih = soup.find("meta", property="article:published_time")
+            if not meta_tarih:
+                meta_tarih = soup.find("meta", attrs={"itemprop": "datePublished"})
             if not meta_tarih:
                 meta_tarih = soup.find("meta", attrs={"name": "datePublished"})
             if meta_tarih and meta_tarih.get("content"):

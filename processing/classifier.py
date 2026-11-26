@@ -93,6 +93,12 @@ class NewsClassifier:
                 "yangın", "yangin", "alev aldı", "alevlere teslim",
                 "küle döndü", "kül oldu", "kundakla", "tutuştu", "yanarak",
             ],
+            # Bu ifadeler bir yangın OLAYI anlatmaz (ihale, ekipman, tatbikat)
+            "haric_ifadeler": [
+                "yangın söndürme tank", "yangın söndürme arac", "yangın söndürme cihaz",
+                "yangın tüp", "yangın merdiven", "yangın tatbikat", "yangın güvenliği",
+                "yangın alarm", "yangın dolab",
+            ],
             "anahtar_kelimeler": [
                 "itfaiye", "söndür", "duman", "alev", "yandı", "yanmış",
                 "dumandan etkilen",
@@ -124,6 +130,11 @@ class NewsClassifier:
                 "gözaltına alındı", "gözaltı", "tutuklandı", "tutuklanarak",
                 "yasa dışı bahis", "uyuşturucu", "rehin", "kaçırıldı",
                 "şantaj", "tacizci",
+            ],
+            # "Cinayet Büro" bir birim adı; "kadın cinayetleri" (çoğul) genelde
+            # 25 Kasım açıklaması / istatistik haberinde geçer, tek bir olayı anlatmaz
+            "haric_ifadeler": [
+                "cinayet büro", "kadın cinayetleri",
             ],
             "anahtar_kelimeler": [
                 "yaralandı", "yaralı", "hayatını kaybetti", "polis",
@@ -186,6 +197,7 @@ class NewsClassifier:
                 "guclu": [self._kalip_derle(k) for k in kurallar["guclu_anahtar_kelimeler"]],
                 "oncelik": kurallar["oncelik"],
                 "kapi": kurallar.get("kapi", "lead"),
+                "haric": [self._kalip_derle(k) for k in kurallar.get("haric_ifadeler", [])],
             }
         self.arac_kaliplari = [self._kalip_derle(k) for k in self.TRAFIK_ARAC_KELIMELERI]
 
@@ -220,17 +232,25 @@ class NewsClassifier:
 
         skorlar = {}
         for tur, kaliplar in self.derli_kaliplar.items():
+            # Hariç ifadeler bu tür için metinden çıkarılır
+            # ("yangın söndürme tankeri" → yangın olayı sayılmaz)
+            t_baslik, t_lead, t_tum = baslik_k, lead, tum_metin
+            for haric in kaliplar["haric"]:
+                t_baslik = haric.sub(" ", t_baslik)
+                t_lead = haric.sub(" ", t_lead)
+                t_tum = haric.sub(" ", t_tum)
+
             # Kapı: güçlü kelime başlıkta veya ilk paragrafta olmalı
-            kapi_metni = baslik_k if kaliplar["kapi"] == "baslik" else lead
+            kapi_metni = t_baslik if kaliplar["kapi"] == "baslik" else t_lead
             if self._say(kaliplar["guclu"], kapi_metni) == 0:
                 skorlar[tur] = 0
                 continue
 
             skor = 0
-            skor += self._say(kaliplar["anahtar"], tum_metin)
-            skor += self._say(kaliplar["anahtar"], baslik_k) * 4
-            skor += self._say(kaliplar["guclu"], tum_metin) * 6
-            skor += self._say(kaliplar["guclu"], baslik_k) * 10
+            skor += self._say(kaliplar["anahtar"], t_tum)
+            skor += self._say(kaliplar["anahtar"], t_baslik) * 4
+            skor += self._say(kaliplar["guclu"], t_tum) * 6
+            skor += self._say(kaliplar["guclu"], t_baslik) * 10
             skorlar[tur] = skor
 
         # Trafik kazası: metinde bir araç da geçmeli
